@@ -59,6 +59,10 @@ export function useResizableWidth({ storageKey, defaultWidth, minWidth, maxWidth
 
     event.preventDefault();
 
+    const handle = event.currentTarget;
+    const pointerId = event.pointerId;
+    handle.setPointerCapture(pointerId);
+
     const startX = event.clientX;
     const startWidth = widthRef.current;
     const previousCursor = document.body.style.cursor;
@@ -67,6 +71,11 @@ export function useResizableWidth({ storageKey, defaultWidth, minWidth, maxWidth
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
 
+    // Block interaction with iframes / map embeds while dragging
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;cursor:col-resize;';
+    document.body.appendChild(overlay);
+
     const handlePointerMove = (moveEvent: PointerEvent) => {
       const deltaX = moveEvent.clientX - startX;
       const nextWidth = direction === 'leading' ? startWidth + deltaX : startWidth - deltaX;
@@ -74,6 +83,8 @@ export function useResizableWidth({ storageKey, defaultWidth, minWidth, maxWidth
     };
 
     const stopResizing = () => {
+      overlay.remove();
+      try { handle.releasePointerCapture(pointerId); } catch { /* already released */ }
       document.body.style.cursor = previousCursor;
       document.body.style.userSelect = previousUserSelect;
       window.removeEventListener('pointermove', handlePointerMove);

@@ -144,6 +144,18 @@ export function YandexMap({ sites, selectedSiteId, onSiteClick }: Props) {
     centerOnSelectedSite();
   }, [selectedSiteId, sites, centerOnSelectedSite]);
 
+  // Keep map in sync with container size (panel resize, window resize)
+  useEffect(() => {
+    const el = mapRef.current;
+    if (!el) return;
+
+    const observer = new ResizeObserver(() => {
+      mapInstance.current?.container.fitToViewport();
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div ref={mapRef} style={{ width: '100%', height: '100%', borderRadius: 'var(--radius)' }} />
   );

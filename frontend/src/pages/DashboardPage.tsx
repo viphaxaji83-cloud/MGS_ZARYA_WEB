@@ -212,7 +212,7 @@ export function DashboardPage() {
         onPointerDown={startLeftPanelResize}
         background="rgba(245, 243, 239, 0.9)"
       />
-      <div style={{ flex: 1, position: 'relative' }}>
+      <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', position: 'relative' }}>
         <YandexMap sites={filteredSites} selectedSiteId={selectedSiteId} onSiteClick={setSelectedSite} />
 
         {/* Summary overlay */}
@@ -247,28 +247,12 @@ export function DashboardPage() {
       />
       <div style={{
         width: `${rightPanelWidth}px`, flexShrink: 0, background: 'var(--color-white)',
-        minWidth: 0, overflow: 'hidden', position: 'relative',
+        minWidth: 0, overflowX: 'hidden', overflowY: 'auto',
       }}>
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          right: 0,
-          bottom: 0,
-          width: `min(100%, ${DEFAULT_RIGHT_PANEL_WIDTH}px)`,
-          maxWidth: '100%',
-          minWidth: 0,
-          boxSizing: 'border-box',
-          overflowX: 'hidden',
-          overflowY: 'auto',
-          background: 'var(--color-white)',
-        }}>
         {selectedSite ? (
           <SiteDetailPanel site={selectedSite} />
         ) : (
           <div style={{
-            width: '100%',
-            minWidth: 0,
-            boxSizing: 'border-box',
             padding: '24px',
             display: 'flex',
             flexDirection: 'column',
@@ -282,7 +266,6 @@ export function DashboardPage() {
             <div style={{ fontSize: 'var(--text-3xl)' }}>◎</div>
             <p style={{
               margin: 0,
-              width: '100%',
               maxWidth: '240px',
               fontSize: 'var(--text-sm)',
               lineHeight: 1.5,
@@ -292,7 +275,6 @@ export function DashboardPage() {
             </p>
           </div>
         )}
-        </div>
       </div>
     </div>
   );
