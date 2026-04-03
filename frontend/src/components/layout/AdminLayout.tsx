@@ -1,4 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import { ResizeHandle } from '@/components/ui/ResizeHandle';
+import { useElementWidth } from '@/hooks/useElementWidth';
+import { useResizableWidth } from '@/hooks/useResizableWidth';
 
 const ADMIN_LINKS = [
   { path: '/admin', label: 'Обзор', exact: true },
@@ -10,11 +13,32 @@ const ADMIN_LINKS = [
   { path: '/admin/audit-log', label: 'Журнал' },
 ];
 
+const DEFAULT_ADMIN_SIDEBAR_WIDTH = 220;
+const MIN_ADMIN_SIDEBAR_WIDTH = 180;
+const MIN_ADMIN_CONTENT_WIDTH = 640;
+const ADMIN_HANDLE_WIDTH = 10;
+
 export function AdminLayout() {
+  const { ref: adminLayoutRef, width: adminLayoutWidth } = useElementWidth<HTMLDivElement>();
+  const { width: adminSidebarWidth, startResize: startAdminSidebarResize } = useResizableWidth({
+    storageKey: 'admin-sidebar-width',
+    defaultWidth: DEFAULT_ADMIN_SIDEBAR_WIDTH,
+    minWidth: MIN_ADMIN_SIDEBAR_WIDTH,
+    maxWidth: () => (
+      adminLayoutWidth > 0
+        ? Math.max(
+            MIN_ADMIN_SIDEBAR_WIDTH,
+            adminLayoutWidth - MIN_ADMIN_CONTENT_WIDTH - ADMIN_HANDLE_WIDTH,
+          )
+        : Number.MAX_SAFE_INTEGER
+    ),
+    direction: 'leading',
+  });
+
   return (
-    <div style={{ display: 'flex', minHeight: 'calc(100vh - var(--topbar-height))' }}>
+    <div ref={adminLayoutRef} style={{ display: 'flex', minHeight: 'calc(100vh - var(--topbar-height))' }}>
       <aside style={{
-        width: '220px', background: 'var(--color-dark)', padding: '24px 0',
+        width: `${adminSidebarWidth}px`, background: 'var(--color-dark)', padding: '24px 0',
         borderRight: '1px solid rgba(205,190,167,0.15)', flexShrink: 0,
       }}>
         <div style={{
@@ -43,6 +67,11 @@ export function AdminLayout() {
           ))}
         </nav>
       </aside>
+      <ResizeHandle
+        onPointerDown={startAdminSidebarResize}
+        lineColor="rgba(205, 190, 167, 0.2)"
+        background="rgba(17, 17, 17, 0.04)"
+      />
       <div style={{ flex: 1, padding: '24px', overflow: 'auto' }}>
         <Outlet />
       </div>

@@ -12,7 +12,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'var(--font-body)', fontWeight: 600, letterSpacing: '0.03em',
     textTransform: 'uppercase', border: 'none', borderRadius: 'var(--radius)',
     cursor: 'pointer', transition: 'all var(--transition-fast)',
-    whiteSpace: 'nowrap',
+    whiteSpace: 'nowrap', lineHeight: 1,
   },
   primary: { background: 'var(--color-accent)', color: 'var(--color-white)' },
   outline: { background: 'transparent', color: 'var(--color-accent)', border: 'var(--border-accent)' },

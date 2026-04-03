@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '@/api/client';
@@ -6,17 +6,69 @@ import { YandexMap } from '@/components/map/YandexMap';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { FillBar } from '@/components/ui/FillBar';
 import { Card } from '@/components/ui/Card';
+import { ResizeHandle } from '@/components/ui/ResizeHandle';
 import { Loader, Skeleton } from '@/components/ui/Loader';
+import { useElementWidth } from '@/hooks/useElementWidth';
+import { useResizableWidth } from '@/hooks/useResizableWidth';
 import { useAppStore } from '@/stores/appStore';
 import { formatTimeAgo, statusLabel } from '@/utils/format';
 import type { Site, DashboardSummary, Alert } from '@/types';
 
 type FilterTab = 'all' | 'critical' | 'warning' | 'offline' | 'no_data';
 
+const DEFAULT_LEFT_PANEL_WIDTH = 320;
+const DEFAULT_RIGHT_PANEL_WIDTH = 380;
+const MIN_LEFT_PANEL_WIDTH = 260;
+const MIN_RIGHT_PANEL_WIDTH = 320;
+const MIN_MAP_WIDTH = 420;
+const HANDLE_WIDTH = 10;
+const HANDLE_GAP_TOTAL = HANDLE_WIDTH * 2;
+
 export function DashboardPage() {
   const { selectedSiteId, setSelectedSite } = useAppStore();
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const { ref: dashboardRef, width: dashboardWidth } = useElementWidth<HTMLDivElement>();
+  const leftPanelWidthRef = useRef(DEFAULT_LEFT_PANEL_WIDTH);
+  const rightPanelWidthRef = useRef(DEFAULT_RIGHT_PANEL_WIDTH);
+
+  const { width: leftPanelWidth, startResize: startLeftPanelResize } = useResizableWidth({
+    storageKey: 'dashboard-left-panel-width',
+    defaultWidth: DEFAULT_LEFT_PANEL_WIDTH,
+    minWidth: MIN_LEFT_PANEL_WIDTH,
+    maxWidth: () => (
+      dashboardWidth > 0
+        ? Math.max(
+            MIN_LEFT_PANEL_WIDTH,
+            dashboardWidth - rightPanelWidthRef.current - MIN_MAP_WIDTH - HANDLE_GAP_TOTAL,
+          )
+        : Number.MAX_SAFE_INTEGER
+    ),
+    direction: 'leading',
+  });
+
+  const { width: rightPanelWidth, startResize: startRightPanelResize } = useResizableWidth({
+    storageKey: 'dashboard-right-panel-width-v2',
+    defaultWidth: DEFAULT_RIGHT_PANEL_WIDTH,
+    minWidth: MIN_RIGHT_PANEL_WIDTH,
+    maxWidth: () => (
+      dashboardWidth > 0
+        ? Math.max(
+            MIN_RIGHT_PANEL_WIDTH,
+            dashboardWidth - leftPanelWidthRef.current - MIN_MAP_WIDTH - HANDLE_GAP_TOTAL,
+          )
+        : Number.MAX_SAFE_INTEGER
+    ),
+    direction: 'trailing',
+  });
+
+  useEffect(() => {
+    leftPanelWidthRef.current = leftPanelWidth;
+  }, [leftPanelWidth]);
+
+  useEffect(() => {
+    rightPanelWidthRef.current = rightPanelWidth;
+  }, [rightPanelWidth]);
 
   const { data: sites = [], isLoading: sitesLoading } = useQuery({
     queryKey: ['sites'],
@@ -56,11 +108,11 @@ export function DashboardPage() {
   const selectedSite = sites.find(s => s.id === selectedSiteId);
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - var(--topbar-height))' }}>
+    <div ref={dashboardRef} style={{ display: 'flex', height: 'calc(100vh - var(--topbar-height))' }}>
       {/* Left Panel — Site List */}
       <div style={{
-        width: 'var(--sidebar-width)', flexShrink: 0, background: 'var(--color-white)',
-        borderRight: 'var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        width: `${leftPanelWidth}px`, flexShrink: 0, background: 'var(--color-white)',
+        display: 'flex', flexDirection: 'column', overflow: 'hidden',
       }}>
         {/* Summary strip */}
         {summary && (
@@ -156,6 +208,10 @@ export function DashboardPage() {
       </div>
 
       {/* Center — Map */}
+      <ResizeHandle
+        onPointerDown={startLeftPanelResize}
+        background="rgba(245, 243, 239, 0.9)"
+      />
       <div style={{ flex: 1, position: 'relative' }}>
         <YandexMap sites={filteredSites} selectedSiteId={selectedSiteId} onSiteClick={setSelectedSite} />
 
@@ -185,21 +241,58 @@ export function DashboardPage() {
       </div>
 
       {/* Right Panel — Selected Site Detail / AI Detection */}
+      <ResizeHandle
+        onPointerDown={startRightPanelResize}
+        background="rgba(245, 243, 239, 0.9)"
+      />
       <div style={{
-        width: 'var(--panel-width)', flexShrink: 0, background: 'var(--color-white)',
-        borderLeft: 'var(--border)', overflow: 'auto',
+        width: `${rightPanelWidth}px`, flexShrink: 0, background: 'var(--color-white)',
+        minWidth: 0, overflow: 'hidden', position: 'relative',
       }}>
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          bottom: 0,
+          width: `min(100%, ${DEFAULT_RIGHT_PANEL_WIDTH}px)`,
+          maxWidth: '100%',
+          minWidth: 0,
+          boxSizing: 'border-box',
+          overflowX: 'hidden',
+          overflowY: 'auto',
+          background: 'var(--color-white)',
+        }}>
         {selectedSite ? (
           <SiteDetailPanel site={selectedSite} />
         ) : (
           <div style={{
-            padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center',
-            justifyContent: 'center', height: '100%', textAlign: 'center', opacity: 0.5,
+            width: '100%',
+            minWidth: 0,
+            boxSizing: 'border-box',
+            padding: '24px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100%',
+            textAlign: 'center',
+            gap: '12px',
+            opacity: 0.5,
           }}>
-            <div style={{ fontSize: 'var(--text-3xl)', marginBottom: '12px' }}>◎</div>
-            <p style={{ fontSize: 'var(--text-sm)' }}>Выберите площадку на карте или в списке</p>
+            <div style={{ fontSize: 'var(--text-3xl)' }}>◎</div>
+            <p style={{
+              margin: 0,
+              width: '100%',
+              maxWidth: '240px',
+              fontSize: 'var(--text-sm)',
+              lineHeight: 1.5,
+              overflowWrap: 'break-word',
+            }}>
+              Выберите площадку на карте или в списке
+            </p>
           </div>
         )}
+        </div>
       </div>
     </div>
   );
@@ -214,7 +307,7 @@ function SiteDetailPanel({ site }: { site: Site }) {
   const lowConfidence = site.ai_confidence > 0 && site.ai_confidence < 0.6;
 
   return (
-    <div>
+    <div style={{ width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
       {/* Header */}
       <div style={{
         padding: '16px 20px', background: 'var(--color-dark)', color: 'var(--color-white)',
@@ -224,8 +317,16 @@ function SiteDetailPanel({ site }: { site: Site }) {
           <span style={{ fontSize: '11px', color: 'var(--color-accent)', fontWeight: 700 }}>{site.code}</span>
           <StatusBadge status={site.status} />
         </div>
-        <h3 style={{ fontSize: 'var(--text-lg)', margin: 0 }}>{site.name}</h3>
-        <p style={{ fontSize: '12px', color: 'var(--color-secondary)', margin: '4px 0 0', opacity: 0.7 }}>{site.address}</p>
+        <h3 style={{ fontSize: 'var(--text-lg)', margin: 0, overflowWrap: 'anywhere' }}>{site.name}</h3>
+        <p style={{
+          fontSize: '12px',
+          color: 'var(--color-secondary)',
+          margin: '4px 0 0',
+          opacity: 0.7,
+          overflowWrap: 'anywhere',
+        }}>
+          {site.address}
+        </p>
       </div>
 
       {/* Image Preview */}
@@ -235,7 +336,20 @@ function SiteDetailPanel({ site }: { site: Site }) {
         overflow: 'hidden', border: 'var(--border)',
       }}>
         {site.last_image_url ? (
-          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#2a2a2a', color: 'var(--color-secondary)', fontSize: 'var(--text-sm)' }}>
+          <div style={{
+            width: '100%',
+            height: '100%',
+            padding: '0 12px',
+            boxSizing: 'border-box',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: '#2a2a2a',
+            color: 'var(--color-secondary)',
+            fontSize: 'var(--text-sm)',
+            textAlign: 'center',
+            overflowWrap: 'anywhere',
+          }}>
             📷 Последний кадр — {formatTimeAgo(site.last_capture_at)}
           </div>
         ) : (
@@ -305,7 +419,7 @@ function SiteDetailPanel({ site }: { site: Site }) {
               padding: '6px 0', borderBottom: '1px solid var(--color-muted)',
               fontSize: '12px', display: 'flex', justifyContent: 'space-between',
             }}>
-              <span>{a.message || a.type}</span>
+              <span style={{ minWidth: 0, marginRight: '12px', overflowWrap: 'anywhere' }}>{a.message || a.type}</span>
               <StatusBadge status={a.status} size="sm" />
             </div>
           ))}
@@ -315,7 +429,7 @@ function SiteDetailPanel({ site }: { site: Site }) {
       {/* Actions */}
       <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <Link to={`/sites/${site.id}`} style={{
-          display: 'block', textAlign: 'center', padding: '10px',
+          display: 'block', width: '100%', boxSizing: 'border-box', textAlign: 'center', padding: '10px',
           background: 'var(--color-accent)', color: 'var(--color-white)',
           borderRadius: 'var(--radius)', fontWeight: 600, fontSize: 'var(--text-sm)',
           textTransform: 'uppercase', letterSpacing: '0.04em', textDecoration: 'none',
@@ -337,8 +451,8 @@ function DetectionFlag({ label, active, good }: { label: string; active: boolean
 
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-sm)' }}>
-      <span>{label}</span>
-      <span style={{ fontWeight: 600, color }}>{text}</span>
+      <span style={{ minWidth: 0, marginRight: '12px' }}>{label}</span>
+      <span style={{ flexShrink: 0, fontWeight: 600, color }}>{text}</span>
     </div>
   );
 }
