@@ -1,0 +1,344 @@
+import { useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { api } from '@/api/client';
+import { YandexMap } from '@/components/map/YandexMap';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { FillBar } from '@/components/ui/FillBar';
+import { Card } from '@/components/ui/Card';
+import { Loader, Skeleton } from '@/components/ui/Loader';
+import { useAppStore } from '@/stores/appStore';
+import { formatTimeAgo, statusLabel } from '@/utils/format';
+import type { Site, DashboardSummary, Alert } from '@/types';
+
+type FilterTab = 'all' | 'critical' | 'warning' | 'offline' | 'no_data';
+
+export function DashboardPage() {
+  const { selectedSiteId, setSelectedSite } = useAppStore();
+  const [filterTab, setFilterTab] = useState<FilterTab>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const { data: sites = [], isLoading: sitesLoading } = useQuery({
+    queryKey: ['sites'],
+    queryFn: () => api.get<{ items: Site[]; total: number }>('/sites').then(r => r.items),
+    refetchInterval: 30000,
+  });
+
+  const { data: summary } = useQuery({
+    queryKey: ['dashboard-summary'],
+    queryFn: () => api.get<DashboardSummary>('/dashboard/summary'),
+    refetchInterval: 30000,
+  });
+
+  const { data: recentAlerts = [] } = useQuery({
+    queryKey: ['alerts-recent'],
+    queryFn: () => api.get<Alert[]>('/alerts?limit=10&status=new'),
+  });
+
+  const filteredSites = useMemo(() => {
+    let list = sites;
+    if (filterTab === 'critical') list = list.filter(s => s.status === 'critical');
+    else if (filterTab === 'warning') list = list.filter(s => s.status === 'warning');
+    else if (filterTab === 'offline') list = list.filter(s => s.status === 'offline');
+    else if (filterTab === 'no_data') list = list.filter(s => s.status === 'no_data');
+
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(s =>
+        s.name.toLowerCase().includes(q) ||
+        s.address.toLowerCase().includes(q) ||
+        s.code.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [sites, filterTab, searchQuery]);
+
+  const selectedSite = sites.find(s => s.id === selectedSiteId);
+
+  return (
+    <div style={{ display: 'flex', height: 'calc(100vh - var(--topbar-height))' }}>
+      {/* Left Panel — Site List */}
+      <div style={{
+        width: 'var(--sidebar-width)', flexShrink: 0, background: 'var(--color-white)',
+        borderRight: 'var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+      }}>
+        {/* Summary strip */}
+        {summary && (
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1px',
+            background: 'var(--color-muted)', borderBottom: 'var(--border)',
+          }}>
+            {[
+              { label: 'Норма', value: summary.sites_normal, color: 'var(--color-status-normal)' },
+              { label: 'Вниман.', value: summary.sites_warning, color: 'var(--color-status-warning)' },
+              { label: 'Крит.', value: summary.sites_critical, color: 'var(--color-status-critical)' },
+            ].map(s => (
+              <div key={s.label} style={{ background: 'var(--color-white)', padding: '8px', textAlign: 'center' }}>
+                <div style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: s.color }}>{s.value}</div>
+                <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.6 }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Search */}
+        <div style={{ padding: '12px' }}>
+          <input
+            type="text" placeholder="Поиск по ID, адресу, названию..."
+            value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+            style={{
+              width: '100%', padding: '8px 12px', fontSize: 'var(--text-sm)',
+              border: 'var(--border)', borderRadius: 'var(--radius-sm)',
+              background: 'var(--color-bg)', outline: 'none', fontFamily: 'var(--font-body)',
+            }}
+          />
+        </div>
+
+        {/* Filter Tabs */}
+        <div style={{ display: 'flex', gap: '2px', padding: '0 12px 8px', flexWrap: 'wrap' }}>
+          {([
+            { key: 'all', label: 'Все' },
+            { key: 'critical', label: 'Крит.' },
+            { key: 'warning', label: 'Вним.' },
+            { key: 'offline', label: 'Офф.' },
+            { key: 'no_data', label: 'Нет данн.' },
+          ] as { key: FilterTab; label: string }[]).map(t => (
+            <button key={t.key} onClick={() => setFilterTab(t.key)} style={{
+              padding: '4px 10px', fontSize: '11px', fontWeight: 600,
+              textTransform: 'uppercase', border: 'var(--border)',
+              borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+              background: filterTab === t.key ? 'var(--color-accent)' : 'transparent',
+              color: filterTab === t.key ? 'var(--color-white)' : 'var(--color-text)',
+            }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Site List */}
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          {sitesLoading ? <Loader /> : filteredSites.map(site => (
+            <div key={site.id} onClick={() => setSelectedSite(site.id)} style={{
+              padding: '12px 14px', borderBottom: '1px solid var(--color-muted)',
+              cursor: 'pointer', transition: 'background var(--transition-fast)',
+              background: site.id === selectedSiteId ? 'rgba(136,36,38,0.06)' : 'transparent',
+              borderLeft: site.id === selectedSiteId ? '3px solid var(--color-accent)' : '3px solid transparent',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                    <span style={{ fontSize: '10px', color: 'var(--color-accent)', fontWeight: 700 }}>{site.code}</span>
+                    <StatusBadge status={site.status} />
+                  </div>
+                  <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {site.name}
+                  </div>
+                  <div style={{ fontSize: '11px', opacity: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {site.address}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }}>
+                    {site.fill_level > 0 ? `${site.fill_level}%` : '—'}
+                  </div>
+                  <div style={{ fontSize: '10px', opacity: 0.5 }}>{formatTimeAgo(site.last_capture_at)}</div>
+                </div>
+              </div>
+              {site.fill_level > 0 && <div style={{ marginTop: '6px' }}><FillBar level={site.fill_level} /></div>}
+            </div>
+          ))}
+          {!sitesLoading && filteredSites.length === 0 && (
+            <div style={{ padding: '24px', textAlign: 'center', opacity: 0.5, fontSize: 'var(--text-sm)' }}>
+              Площадки не найдены
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Center — Map */}
+      <div style={{ flex: 1, position: 'relative' }}>
+        <YandexMap sites={filteredSites} selectedSiteId={selectedSiteId} onSiteClick={setSelectedSite} />
+
+        {/* Summary overlay */}
+        {summary && (
+          <div style={{
+            position: 'absolute', top: '12px', left: '12px', zIndex: 10,
+            display: 'flex', gap: '6px',
+          }}>
+            {[
+              { label: 'Площадки', value: summary.total_sites, color: 'var(--color-text)' },
+              { label: 'Камеры ON', value: summary.cameras_online, color: 'var(--color-status-normal)' },
+              { label: 'Камеры OFF', value: summary.cameras_offline, color: 'var(--color-status-critical)' },
+              { label: 'Тревоги', value: summary.active_alerts, color: 'var(--color-status-critical)' },
+            ].map(s => (
+              <div key={s.label} style={{
+                background: 'var(--color-dark)', color: 'var(--color-white)',
+                padding: '6px 12px', borderRadius: 'var(--radius-sm)',
+                fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.03em',
+              }}>
+                <span style={{ color: s.color, fontWeight: 700, marginRight: '4px' }}>{s.value}</span>
+                {s.label}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Right Panel — Selected Site Detail / AI Detection */}
+      <div style={{
+        width: 'var(--panel-width)', flexShrink: 0, background: 'var(--color-white)',
+        borderLeft: 'var(--border)', overflow: 'auto',
+      }}>
+        {selectedSite ? (
+          <SiteDetailPanel site={selectedSite} />
+        ) : (
+          <div style={{
+            padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center',
+            justifyContent: 'center', height: '100%', textAlign: 'center', opacity: 0.5,
+          }}>
+            <div style={{ fontSize: 'var(--text-3xl)', marginBottom: '12px' }}>◎</div>
+            <p style={{ fontSize: 'var(--text-sm)' }}>Выберите площадку на карте или в списке</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SiteDetailPanel({ site }: { site: Site }) {
+  const { data: alerts = [] } = useQuery({
+    queryKey: ['site-alerts', site.id],
+    queryFn: () => api.get<Alert[]>(`/sites/${site.id}/alerts?limit=5`),
+  });
+
+  const lowConfidence = site.ai_confidence > 0 && site.ai_confidence < 0.6;
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{
+        padding: '16px 20px', background: 'var(--color-dark)', color: 'var(--color-white)',
+        borderBottom: '2px solid var(--color-accent)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+          <span style={{ fontSize: '11px', color: 'var(--color-accent)', fontWeight: 700 }}>{site.code}</span>
+          <StatusBadge status={site.status} />
+        </div>
+        <h3 style={{ fontSize: 'var(--text-lg)', margin: 0 }}>{site.name}</h3>
+        <p style={{ fontSize: '12px', color: 'var(--color-secondary)', margin: '4px 0 0', opacity: 0.7 }}>{site.address}</p>
+      </div>
+
+      {/* Image Preview */}
+      <div style={{
+        margin: '16px', background: 'var(--color-muted)', borderRadius: 'var(--radius)',
+        height: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        overflow: 'hidden', border: 'var(--border)',
+      }}>
+        {site.last_image_url ? (
+          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#2a2a2a', color: 'var(--color-secondary)', fontSize: 'var(--text-sm)' }}>
+            📷 Последний кадр — {formatTimeAgo(site.last_capture_at)}
+          </div>
+        ) : (
+          <span style={{ fontSize: 'var(--text-sm)', opacity: 0.5 }}>Нет изображения</span>
+        )}
+      </div>
+
+      {/* AI Detection Section */}
+      <div style={{ padding: '0 16px' }}>
+        <div style={{
+          fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
+          color: 'var(--color-accent)', marginBottom: '12px', paddingBottom: '8px', borderBottom: 'var(--border)',
+        }}>
+          AI Detection
+        </div>
+
+        {/* Fill Level */}
+        <div style={{ marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 500 }}>Заполненность</span>
+            <span style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }}>
+              {site.fill_level > 0 ? `${site.fill_level}%` : '—'}
+            </span>
+          </div>
+          <FillBar level={site.fill_level} height={8} />
+        </div>
+
+        {/* Confidence */}
+        <div style={{ marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 'var(--text-sm)' }}>AI Confidence</span>
+            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>
+              {site.ai_confidence > 0 ? `${(site.ai_confidence * 100).toFixed(0)}%` : '—'}
+            </span>
+          </div>
+          {lowConfidence && (
+            <div style={{
+              marginTop: '6px', padding: '6px 10px', fontSize: '11px',
+              background: 'rgba(201,138,26,0.1)', border: '1px solid var(--color-status-warning)',
+              borderRadius: 'var(--radius-sm)', color: 'var(--color-status-warning)',
+            }}>
+              ⚠ Низкая уверенность — требует проверки оператором
+            </div>
+          )}
+        </div>
+
+        {/* Detection Flags */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+          <DetectionFlag label="Переполнение" active={site.has_overflow} />
+          <DetectionFlag label="Мусор вне контейнера" active={site.has_litter_outside} />
+          <DetectionFlag label="Камера" active={site.status !== 'offline'} good />
+          <DetectionFlag label="Свежие данные" active={!!site.last_capture_at} good />
+        </div>
+      </div>
+
+      {/* Recent Alerts */}
+      {alerts.length > 0 && (
+        <div style={{ padding: '0 16px 16px' }}>
+          <div style={{
+            fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
+            color: 'var(--color-accent)', marginBottom: '8px', paddingBottom: '6px', borderBottom: 'var(--border)',
+          }}>
+            Последние тревоги
+          </div>
+          {alerts.map(a => (
+            <div key={a.id} style={{
+              padding: '6px 0', borderBottom: '1px solid var(--color-muted)',
+              fontSize: '12px', display: 'flex', justifyContent: 'space-between',
+            }}>
+              <span>{a.message || a.type}</span>
+              <StatusBadge status={a.status} size="sm" />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Actions */}
+      <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <Link to={`/sites/${site.id}`} style={{
+          display: 'block', textAlign: 'center', padding: '10px',
+          background: 'var(--color-accent)', color: 'var(--color-white)',
+          borderRadius: 'var(--radius)', fontWeight: 600, fontSize: 'var(--text-sm)',
+          textTransform: 'uppercase', letterSpacing: '0.04em', textDecoration: 'none',
+        }}>
+          Открыть объект →
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function DetectionFlag({ label, active, good }: { label: string; active: boolean; good?: boolean }) {
+  const color = good
+    ? (active ? 'var(--color-status-normal)' : 'var(--color-status-critical)')
+    : (active ? 'var(--color-status-critical)' : 'var(--color-status-normal)');
+  const text = good
+    ? (active ? 'Да' : 'Нет')
+    : (active ? 'Да' : 'Нет');
+
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-sm)' }}>
+      <span>{label}</span>
+      <span style={{ fontWeight: 600, color }}>{text}</span>
+    </div>
+  );
+}
