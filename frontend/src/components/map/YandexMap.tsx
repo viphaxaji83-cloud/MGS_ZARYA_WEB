@@ -23,36 +23,24 @@ export function YandexMap({ sites, selectedSiteId, onSiteClick }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const markersRef = useRef<Map<number, any>>(new Map());
-
-  const initMap = useCallback(() => {
-    if (!mapRef.current || !window.ymaps) return;
-
-    window.ymaps.ready(() => {
-      if (mapInstance.current) return;
-
-      mapInstance.current = new window.ymaps.Map(mapRef.current, {
-        center: [44.6078, 40.1058],
-        zoom: 13,
-        controls: ['zoomControl', 'geolocationControl'],
-      }, {
-        suppressMapOpenBlock: true,
-      });
-
-      updateMarkers();
-    });
-  }, []);
+  const sitesRef = useRef(sites);
+  const selectedSiteIdRef = useRef(selectedSiteId);
+  const onSiteClickRef = useRef(onSiteClick);
 
   const updateMarkers = useCallback(() => {
-    if (!mapInstance.current) return;
+    if (!mapInstance.current || !window.ymaps) return;
     const map = mapInstance.current;
+    const currentSites = sitesRef.current;
+    const currentSelectedSiteId = selectedSiteIdRef.current;
+    const handleSiteClick = onSiteClickRef.current;
 
     // Remove old markers
     markersRef.current.forEach(m => map.geoObjects.remove(m));
     markersRef.current.clear();
 
-    sites.forEach(site => {
+    currentSites.forEach(site => {
       const color = STATUS_COLORS[site.status] || STATUS_COLORS.no_data;
-      const isSelected = site.id === selectedSiteId;
+      const isSelected = site.id === currentSelectedSiteId;
 
       const placemark = new window.ymaps.Placemark(
         [site.lat, site.lon],
@@ -89,11 +77,42 @@ export function YandexMap({ sites, selectedSiteId, onSiteClick }: Props) {
         }
       );
 
-      placemark.events.add('click', () => onSiteClick(site.id));
+      placemark.events.add('click', () => handleSiteClick(site.id));
       map.geoObjects.add(placemark);
       markersRef.current.set(site.id, placemark);
     });
-  }, [sites, selectedSiteId, onSiteClick]);
+  }, []);
+
+  const centerOnSelectedSite = useCallback(() => {
+    if (!mapInstance.current) return;
+
+    const currentSelectedSiteId = selectedSiteIdRef.current;
+    if (!currentSelectedSiteId) return;
+
+    const site = sitesRef.current.find(item => item.id === currentSelectedSiteId);
+    if (site) {
+      mapInstance.current.setCenter([site.lat, site.lon], 15, { duration: 300 });
+    }
+  }, []);
+
+  const initMap = useCallback(() => {
+    if (!mapRef.current || !window.ymaps) return;
+
+    window.ymaps.ready(() => {
+      if (!mapRef.current || mapInstance.current) return;
+
+      mapInstance.current = new window.ymaps.Map(mapRef.current, {
+        center: [44.6078, 40.1058],
+        zoom: 13,
+        controls: ['zoomControl', 'geolocationControl'],
+      }, {
+        suppressMapOpenBlock: true,
+      });
+
+      updateMarkers();
+      centerOnSelectedSite();
+    });
+  }, [centerOnSelectedSite, updateMarkers]);
 
   useEffect(() => {
     // Load Yandex Maps API if not loaded
@@ -110,18 +129,20 @@ export function YandexMap({ sites, selectedSiteId, onSiteClick }: Props) {
   }, [initMap]);
 
   useEffect(() => {
-    if (mapInstance.current) updateMarkers();
-  }, [updateMarkers]);
+    sitesRef.current = sites;
+    selectedSiteIdRef.current = selectedSiteId;
+    onSiteClickRef.current = onSiteClick;
+
+    if (mapInstance.current) {
+      updateMarkers();
+      centerOnSelectedSite();
+    }
+  }, [sites, selectedSiteId, onSiteClick, updateMarkers, centerOnSelectedSite]);
 
   // Pan to selected site
   useEffect(() => {
-    if (selectedSiteId && mapInstance.current) {
-      const site = sites.find(s => s.id === selectedSiteId);
-      if (site) {
-        mapInstance.current.setCenter([site.lat, site.lon], 15, { duration: 300 });
-      }
-    }
-  }, [selectedSiteId, sites]);
+    centerOnSelectedSite();
+  }, [selectedSiteId, sites, centerOnSelectedSite]);
 
   return (
     <div ref={mapRef} style={{ width: '100%', height: '100%', borderRadius: 'var(--radius)' }} />
