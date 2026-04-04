@@ -40,7 +40,7 @@ export function ToastContainer() {
     }}>
       {toasts.map(t => (
         <div key={t.id} style={{
-          background: 'var(--color-dark)', color: 'var(--color-white)',
+          background: 'var(--color-dark)', color: 'var(--color-text-light)',
           padding: '12px 20px', borderRadius: 'var(--radius)',
           borderLeft: `4px solid ${TYPE_COLORS[t.type]}`,
           fontSize: 'var(--text-sm)', boxShadow: 'var(--shadow-md)',

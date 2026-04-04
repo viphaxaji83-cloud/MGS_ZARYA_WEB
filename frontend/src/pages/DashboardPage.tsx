@@ -180,7 +180,7 @@ export function DashboardPage() {
               textTransform: 'uppercase', border: 'var(--border)',
               borderRadius: 'var(--radius-sm)', cursor: 'pointer',
               background: filterTab === t.key ? 'var(--color-accent)' : 'transparent',
-              color: filterTab === t.key ? 'var(--color-white)' : 'var(--color-text)',
+              color: filterTab === t.key ? 'var(--color-text-light)' : 'var(--color-text)',
             }}>
               {t.label}
             </button>
@@ -241,19 +241,25 @@ export function DashboardPage() {
             position: 'absolute', top: '12px', left: '12px', zIndex: 10,
             display: 'flex', gap: '6px',
           }}>
-            {[
-              { label: 'Площадки', value: summary.total_sites, color: 'var(--color-text)' },
-              { label: 'Камеры ON', value: summary.cameras_online, color: 'var(--color-status-normal)' },
-              { label: 'Камеры OFF', value: summary.cameras_offline, color: 'var(--color-status-critical)' },
-              { label: 'Тревоги', value: summary.active_alerts, color: 'var(--color-status-critical)' },
+            {[ 
+              { label: 'Площадки', value: summary.total_sites, color: '#f5f3ef' },
+              { label: 'Камеры ON', value: summary.cameras_online, color: '#47bf4f' },
+              { label: 'Камеры OFF', value: summary.cameras_offline, color: '#c29545' },
             ].map(s => (
               <div key={s.label} style={{
-                background: 'var(--color-dark)', color: 'var(--color-white)',
+                background: 'var(--color-dark)', color: 'var(--color-text-light)',
                 padding: '6px 12px', borderRadius: 'var(--radius-sm)',
                 fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.03em',
+                textAlign: 'center',
               }}>
-                <span style={{ color: s.color, fontWeight: 700, marginRight: '4px' }}>{s.value}</span>
-                {s.label}
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  transform: 'translateY(1px)',
+                }}>
+                  <span style={{ color: s.color, fontWeight: 400, marginRight: '4px' }}>{s.value}</span>
+                  <span>{s.label}</span>
+                </span>
               </div>
             ))}
           </div>
@@ -312,7 +318,7 @@ function SiteDetailPanel({ site }: { site: Site }) {
     <div style={{ width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
       {/* Header */}
       <div style={{
-        padding: '16px 20px', background: 'var(--color-dark)', color: 'var(--color-white)',
+        padding: '16px 20px', background: 'var(--color-dark)', color: 'var(--color-text-light)',
         borderBottom: '2px solid var(--color-accent)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
@@ -432,7 +438,7 @@ function SiteDetailPanel({ site }: { site: Site }) {
       <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <Link to={`/sites/${site.id}`} style={{
           display: 'block', width: '100%', boxSizing: 'border-box', textAlign: 'center', padding: '10px',
-          background: 'var(--color-accent)', color: 'var(--color-white)',
+          background: 'var(--color-accent)', color: 'var(--color-text-light)',
           borderRadius: 'var(--radius)', fontWeight: 600, fontSize: 'var(--text-sm)',
           textTransform: 'uppercase', letterSpacing: '0.04em', textDecoration: 'none',
         }}>

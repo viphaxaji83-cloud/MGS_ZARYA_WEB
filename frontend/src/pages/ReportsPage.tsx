@@ -39,7 +39,7 @@ export function ReportsPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h1 style={{ fontSize: 'var(--text-2xl)', margin: 0 }}>ОТЧЁТЫ</h1>
         <button onClick={exportCSV} disabled={!data} style={{
-          padding: '8px 16px', background: 'var(--color-accent)', color: 'var(--color-white)',
+          padding: '8px 16px', background: 'var(--color-accent)', color: 'var(--color-text-light)',
           border: 'none', borderRadius: 'var(--radius)', fontSize: 'var(--text-sm)',
           fontWeight: 600, textTransform: 'uppercase', cursor: 'pointer', opacity: data ? 1 : 0.5,
         }}>

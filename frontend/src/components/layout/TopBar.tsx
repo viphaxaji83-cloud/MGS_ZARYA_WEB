@@ -29,7 +29,7 @@ export function TopBar({ wsConnected: _wsConnected }: { wsConnected: boolean }) 
     <header style={{
       height: 'var(--topbar-height)',
       background: 'var(--color-dark)',
-      color: 'var(--color-white)',
+      color: 'var(--color-text-light)',
       display: 'flex',
       alignItems: 'center',
       padding: '0 20px',
