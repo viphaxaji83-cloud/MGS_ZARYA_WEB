@@ -56,7 +56,7 @@ export function TopBar({ wsConnected: _wsConnected }: { wsConnected: boolean }) 
         </span>
         <span style={{
           fontSize: 'var(--text-xs)',
-          color: 'var(--color-secondary)',
+          color: 'var(--color-text-light)',
           opacity: 0.7,
           textTransform: 'uppercase',
           letterSpacing: '0.05em',
@@ -79,7 +79,7 @@ export function TopBar({ wsConnected: _wsConnected }: { wsConnected: boolean }) 
                 fontWeight: 600,
                 textTransform: 'uppercase',
                 letterSpacing: '0.04em',
-                color: active ? 'var(--color-accent)' : 'var(--color-secondary)',
+                color: active ? 'var(--color-accent)' : 'var(--color-text-light)',
                 textDecoration: 'none',
                 borderBottom: active ? '2px solid var(--color-accent)' : '2px solid transparent',
                 transition: 'color var(--transition-fast)',
@@ -92,14 +92,14 @@ export function TopBar({ wsConnected: _wsConnected }: { wsConnected: boolean }) 
       </nav>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-secondary)' }}>{user?.name}</span>
+        <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-light)' }}>{user?.name}</span>
 
         <button
           onClick={handleLogout}
           style={{
             background: 'none',
             border: '1px solid rgba(205,190,167,0.3)',
-            color: 'var(--color-secondary)',
+            color: 'var(--color-text-light)',
             padding: '6px 12px',
             borderRadius: 'var(--radius-sm)',
             fontSize: 'var(--text-xs)',
