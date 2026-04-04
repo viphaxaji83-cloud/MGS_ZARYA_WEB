@@ -16,6 +16,14 @@ import type { Site, DashboardSummary, Alert } from '@/types';
 
 type FilterTab = 'all' | 'critical' | 'warning' | 'offline' | 'no_data';
 
+const SITE_STATUS_ORDER: Record<string, number> = {
+  critical: 0,
+  warning: 1,
+  normal: 2,
+  no_data: 3,
+  offline: 4,
+};
+
 const DEFAULT_LEFT_PANEL_WIDTH = 320;
 const DEFAULT_RIGHT_PANEL_WIDTH = 380;
 const MIN_LEFT_PANEL_WIDTH = 260;
@@ -88,7 +96,7 @@ export function DashboardPage() {
   });
 
   const filteredSites = useMemo(() => {
-    let list = sites;
+    let list = [...sites];
     if (filterTab === 'critical') list = list.filter(s => s.status === 'critical');
     else if (filterTab === 'warning') list = list.filter(s => s.status === 'warning');
     else if (filterTab === 'offline') list = list.filter(s => s.status === 'offline');
@@ -102,6 +110,18 @@ export function DashboardPage() {
         s.code.toLowerCase().includes(q)
       );
     }
+
+    if (filterTab === 'all') {
+      list.sort((a, b) => {
+        const byStatus = (SITE_STATUS_ORDER[a.status] ?? Number.MAX_SAFE_INTEGER)
+          - (SITE_STATUS_ORDER[b.status] ?? Number.MAX_SAFE_INTEGER);
+
+        if (byStatus !== 0) return byStatus;
+
+        return a.code.localeCompare(b.code, 'ru', { numeric: true });
+      });
+    }
+
     return list;
   }, [sites, filterTab, searchQuery]);
 
