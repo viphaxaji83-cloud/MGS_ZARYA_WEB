@@ -1,5 +1,5 @@
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
 
 const NAV_ITEMS = [
   { path: '/dashboard', label: 'Мониторинг' },
@@ -26,44 +26,37 @@ export function TopBar({ wsConnected: _wsConnected }: { wsConnected: boolean }) 
   const allNav = user?.role === 'admin' ? [...NAV_ITEMS, ...ADMIN_NAV] : NAV_ITEMS;
 
   return (
-    <header style={{
-      height: 'var(--topbar-height)',
-      background: 'var(--color-dark)',
-      color: 'var(--color-text-light)',
-      display: 'flex',
-      alignItems: 'center',
-      padding: '0 20px',
-      gap: '24px',
-      borderBottom: '2px solid var(--color-accent)',
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      zIndex: 100,
-    }}>
+    <header
+      style={{
+        height: 'var(--topbar-height)',
+        background: 'var(--color-dark)',
+        color: 'var(--color-text-light)',
+        display: 'flex',
+        alignItems: 'center',
+        padding: '0 20px',
+        gap: '24px',
+        borderBottom: '2px solid var(--color-accent)',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 100,
+      }}
+    >
       <Link
         to="/dashboard"
         style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: 'inherit' }}
       >
-        <span style={{
-          fontFamily: 'var(--font-heading)',
-          fontSize: 'var(--text-xl)',
-          letterSpacing: '0.1em',
-          color: 'var(--color-accent)',
-        }}
-        >
-          ЗАРЯ
-        </span>
-        <span style={{
-          fontSize: 'var(--text-xs)',
-          color: 'var(--color-text-light)',
-          opacity: 0.7,
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
-        }}
-        >
-          мониторинг
-        </span>
+        <img
+          src="/branding/Cut_logo_light.png"
+          alt="ЗАРЯ"
+          style={{
+            display: 'block',
+            height: '18px',
+            width: 'auto',
+            flexShrink: 0,
+          }}
+        />
       </Link>
 
       <nav style={{ display: 'flex', gap: '4px', marginLeft: '20px', flex: 1 }}>
