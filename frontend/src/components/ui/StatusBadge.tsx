@@ -36,7 +36,7 @@ export function StatusBadge({ status, label, size = 'sm' }: Props) {
     <span style={{
       display: 'inline-flex',
       alignItems: 'center',
-      gap: '6px',
+      justifyContent: 'center',
       padding: `${py} ${px}`,
       fontSize,
       fontWeight: 600,
@@ -47,12 +47,9 @@ export function StatusBadge({ status, label, size = 'sm' }: Props) {
       border: `1px solid ${color}`,
       borderRadius: 'var(--radius-sm)',
       whiteSpace: 'nowrap',
+      textAlign: 'center',
     }}>
-      <span style={{
-        width: '8px', height: '8px', borderRadius: '50%',
-        background: color, flexShrink: 0,
-      }} />
-      {text}
+      <span style={{ display: 'inline-block', transform: 'translateY(1px)' }}>{text}</span>
     </span>
   );
 }

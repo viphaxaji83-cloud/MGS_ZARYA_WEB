@@ -24,7 +24,7 @@ const SITE_STATUS_ORDER: Record<string, number> = {
   offline: 4,
 };
 
-const DEFAULT_LEFT_PANEL_WIDTH = 320;
+const DEFAULT_LEFT_PANEL_WIDTH = 350;
 const DEFAULT_RIGHT_PANEL_WIDTH = 380;
 const MIN_LEFT_PANEL_WIDTH = 260;
 const MIN_RIGHT_PANEL_WIDTH = 320;
@@ -41,7 +41,7 @@ export function DashboardPage() {
   const rightPanelWidthRef = useRef(DEFAULT_RIGHT_PANEL_WIDTH);
 
   const { width: leftPanelWidth, startResize: startLeftPanelResize } = useResizableWidth({
-    storageKey: 'dashboard-left-panel-width',
+    storageKey: 'dashboard-left-panel-width-v2',
     defaultWidth: DEFAULT_LEFT_PANEL_WIDTH,
     minWidth: MIN_LEFT_PANEL_WIDTH,
     maxWidth: () => (
@@ -191,32 +191,65 @@ export function DashboardPage() {
         <div style={{ flex: 1, overflow: 'auto' }}>
           {sitesLoading ? <Loader /> : filteredSites.map(site => (
             <div key={site.id} onClick={() => setSelectedSite(site.id)} style={{
-              padding: '12px 14px', borderBottom: '1px solid var(--color-muted)',
-              cursor: 'pointer', transition: 'background var(--transition-fast)',
-              background: site.id === selectedSiteId ? 'rgba(136,36,38,0.06)' : 'transparent',
-              borderLeft: site.id === selectedSiteId ? '3px solid var(--color-accent)' : '3px solid transparent',
+              padding: '14px 16px',
+              margin: '6px 8px',
+              borderRadius: 'var(--radius)',
+              border: site.id === selectedSiteId ? '1px solid rgba(136,36,38,0.22)' : '1px solid rgba(205,190,167,0.55)',
+              cursor: 'pointer',
+              transition: 'background var(--transition-fast), box-shadow var(--transition-fast)',
+              background: site.id === selectedSiteId ? 'rgba(136,36,38,0.06)' : 'var(--color-white)',
+              boxShadow: site.id === selectedSiteId ? '0 0 0 1px var(--color-accent)' : 'var(--shadow-sm)',
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                    <span style={{ fontSize: '10px', color: 'var(--color-accent)', fontWeight: 700 }}>{site.code}</span>
-                    <StatusBadge status={site.status} />
-                  </div>
-                  <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {site.name}
-                  </div>
-                  <div style={{ fontSize: '11px', opacity: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {site.address}
-                  </div>
+              {/* Row 1: Name + Status badge */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  fontSize: '15px',
+                  fontWeight: 600,
+                  lineHeight: 1.05,
+                  color: 'var(--color-text)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  minWidth: 0,
+                  transform: 'translateY(1px)',
+                }}>
+                  {site.name}
                 </div>
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }}>
-                    {site.fill_level > 0 ? `${site.fill_level}%` : '—'}
-                  </div>
-                  <div style={{ fontSize: '10px', opacity: 0.5 }}>{formatTimeAgo(site.last_capture_at)}</div>
+                <StatusBadge status={site.status} />
+              </div>
+              {/* Row 2: Code + Time ago */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <div style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  letterSpacing: '0.04em',
+                  color: 'var(--color-accent)',
+                  textTransform: 'uppercase',
+                }}>
+                  {site.code}
+                </div>
+                <div style={{ fontSize: '10px', color: 'rgba(50,48,48,0.45)', whiteSpace: 'nowrap' }}>
+                  {formatTimeAgo(site.last_capture_at)}
                 </div>
               </div>
-              {site.fill_level > 0 && <div style={{ marginTop: '6px' }}><FillBar level={site.fill_level} /></div>}
+              {/* Row 3: Fill bar + Percentage */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {site.fill_level > 0 ? <FillBar level={site.fill_level} height={8} /> : <div style={{ height: '8px' }} />}
+                </div>
+                <div style={{
+                  fontSize: 'var(--text-lg)',
+                  fontWeight: 700,
+                  color: 'var(--color-text)',
+                  whiteSpace: 'nowrap',
+                  minWidth: '50px',
+                  textAlign: 'right',
+                }}>
+                  {site.fill_level > 0 ? `${site.fill_level}%` : '—'}
+                </div>
+              </div>
             </div>
           ))}
           {!sitesLoading && filteredSites.length === 0 && (
