@@ -5,7 +5,7 @@ interface Props {
 }
 
 export function FillBar({ level, height = 6, trackColor = 'var(--color-muted)' }: Props) {
-  const color = level < 60 ? 'var(--color-status-normal)' :
+  const color = level < 55 ? 'var(--color-status-normal)' :
                 level < 85 ? 'var(--color-status-warning)' :
                 'var(--color-status-critical)';
 

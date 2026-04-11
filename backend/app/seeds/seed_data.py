@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import text
 
 from ..core.database import engine, async_session, Base
+from ..core.fill_levels import CRITICAL_FILL_LEVEL, WARNING_FILL_LEVEL, status_from_fill_level
 from ..core.security import hash_password
 from ..models.user import User
 from ..models.site import Site
@@ -60,7 +61,7 @@ SITES_DATA = [
 
 PLATFORM_SETTINGS = [
     {"key": "dashboard_refresh_interval", "value": "30", "value_type": "int", "description": "Интервал автообновления dashboard (секунды)"},
-    {"key": "fill_level_warning_threshold", "value": "60", "value_type": "int", "description": "Порог заполненности для статуса 'внимание' (%)"},
+    {"key": "fill_level_warning_threshold", "value": "55", "value_type": "int", "description": "Порог заполненности для статуса 'внимание' (%)"},
     {"key": "fill_level_critical_threshold", "value": "85", "value_type": "int", "description": "Порог заполненности для статуса 'критично' (%)"},
     {"key": "alert_overflow_threshold", "value": "90", "value_type": "int", "description": "Порог генерации alert переполнения (%)"},
     {"key": "low_confidence_threshold", "value": "0.6", "value_type": "float", "description": "Порог низкой уверенности AI"},
@@ -88,14 +89,14 @@ ALERT_MESSAGES = {
 def _random_status_and_fill():
     r = random.random()
     if r < 0.45:
-        fill = round(random.uniform(10, 55), 1)
-        return "normal", fill
+        fill = round(random.uniform(10, WARNING_FILL_LEVEL - 0.1), 1)
+        return status_from_fill_level(fill), fill
     elif r < 0.70:
-        fill = round(random.uniform(56, 84), 1)
-        return "warning", fill
+        fill = round(random.uniform(WARNING_FILL_LEVEL, CRITICAL_FILL_LEVEL - 0.1), 1)
+        return status_from_fill_level(fill), fill
     elif r < 0.85:
-        fill = round(random.uniform(85, 98), 1)
-        return "critical", fill
+        fill = round(random.uniform(CRITICAL_FILL_LEVEL, 98), 1)
+        return status_from_fill_level(fill), fill
     elif r < 0.93:
         return "no_data", 0.0
     else:
@@ -179,7 +180,7 @@ async def seed():
                 hours_ago = random.uniform(1, 48)
                 captured = now - timedelta(hours=hours_ago)
                 o_fill = max(0, min(100, site.fill_level + random.uniform(-15, 15)))
-                o_status = "normal" if o_fill < 60 else "warning" if o_fill < 85 else "critical"
+                o_status = status_from_fill_level(o_fill)
                 obs = Observation(
                     site_id=site.id, camera_id=site.camera_id,
                     image_url=f"/static/mock/obs_{site.id}_{j}.jpg",

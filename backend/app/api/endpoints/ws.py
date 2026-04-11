@@ -3,6 +3,7 @@ import json
 import random
 from datetime import datetime, timezone
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from ...core.fill_levels import status_from_fill_level
 
 router = APIRouter(tags=["websocket"])
 
@@ -35,10 +36,9 @@ async def live_simulator():
         if not connected_clients:
             continue
 
-        statuses = ["normal", "warning", "critical", "no_data"]
         site_id = random.randint(1, 30)
         fill = round(random.uniform(10, 95), 1)
-        status = "normal" if fill < 60 else "warning" if fill < 85 else "critical"
+        status = status_from_fill_level(fill)
 
         await broadcast({
             "type": "site_update",
