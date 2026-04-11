@@ -163,11 +163,13 @@ export function SitesListPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--text-sm)' }}>
             <thead>
               <tr style={{ background: 'var(--color-bg)', borderBottom: 'var(--border)' }}>
-                {TABLE_HEADERS.map(({ label, sortKey: columnSortKey }) => (
+                {TABLE_HEADERS.map(({ label, sortKey: columnSortKey }, index) => (
                   <th
                     key={label || 'actions'}
                     style={{
                       padding: '10px 14px',
+                      width: index === 2 ? '280px' : undefined,
+                      minWidth: index === 2 ? '280px' : undefined,
                       textAlign: 'left',
                       fontSize: '11px',
                       textTransform: 'uppercase',
@@ -209,7 +211,23 @@ export function SitesListPage() {
                 <tr key={site.id} style={{ borderBottom: '1px solid var(--color-muted)' }}>
                   <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--color-accent)' }}>{site.code}</td>
                   <td style={{ padding: '10px 14px' }}>{site.name}</td>
-                  <td style={{ padding: '10px 14px', opacity: 0.7, maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{site.address}</td>
+                  <td style={{ padding: '10px 14px', width: '280px', minWidth: '280px' }}>
+                    <div
+                      title={site.address}
+                      style={{
+                        opacity: 0.7,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        lineHeight: 1.35,
+                        maxHeight: '2.7em',
+                        wordBreak: 'break-word',
+                      }}
+                    >
+                      {site.address}
+                    </div>
+                  </td>
                   <td style={{ padding: '10px 14px' }}>{site.district || '—'}</td>
                   <td style={{ padding: '10px 14px' }}><StatusBadge status={site.status} /></td>
                   <td style={{ padding: '10px 14px', width: '150px' }}>
