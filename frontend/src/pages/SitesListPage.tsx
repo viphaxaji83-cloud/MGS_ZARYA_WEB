@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '@/api/client';
@@ -31,6 +31,8 @@ const TABLE_HEADERS: Array<{ label: string; sortKey?: SortKey }> = [
   { label: '' },
 ];
 
+const ROWS_PER_PAGE = 15;
+
 function compareText(a: string | null | undefined, b: string | null | undefined) {
   const left = a?.trim();
   const right = b?.trim();
@@ -47,6 +49,7 @@ export function SitesListPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('code');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const { data, isLoading } = useQuery({
     queryKey: ['sites', search, statusFilter],
@@ -104,6 +107,23 @@ export function SitesListPage() {
     return sortDirection === 'asc' ? result : -result;
   });
 
+  const totalPages = Math.max(1, Math.ceil(sortedSites.length / ROWS_PER_PAGE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pageStart = (safeCurrentPage - 1) * ROWS_PER_PAGE;
+  const paginatedSites = sortedSites.slice(pageStart, pageStart + ROWS_PER_PAGE);
+  const visibleFrom = sortedSites.length === 0 ? 0 : pageStart + 1;
+  const visibleTo = Math.min(pageStart + ROWS_PER_PAGE, sortedSites.length);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter, sortKey, sortDirection]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   const handleSort = (nextSortKey: SortKey) => {
     if (sortKey === nextSortKey) {
       setSortDirection(currentDirection => currentDirection === 'asc' ? 'desc' : 'asc');
@@ -113,6 +133,8 @@ export function SitesListPage() {
     setSortKey(nextSortKey);
     setSortDirection('asc');
   };
+
+  const pageNumbers = Array.from({ length: totalPages }, (_, index) => index + 1);
 
   return (
     <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
@@ -207,7 +229,7 @@ export function SitesListPage() {
               </tr>
             </thead>
             <tbody>
-              {sortedSites.map(site => (
+              {paginatedSites.map(site => (
                 <tr key={site.id} style={{ borderBottom: '1px solid var(--color-muted)' }}>
                   <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--color-accent)' }}>{site.code}</td>
                   <td style={{ padding: '10px 14px' }}>{site.name}</td>
@@ -247,6 +269,81 @@ export function SitesListPage() {
               ))}
             </tbody>
           </table>
+          {totalPages > 1 && (
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '14px',
+                borderTop: 'var(--border)',
+                background: 'rgba(245, 243, 239, 0.55)',
+              }}
+            >
+              <span style={{ fontSize: '12px', opacity: 0.65 }}>
+                {visibleFrom}-{visibleTo} из {sortedSites.length}
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
+                  disabled={safeCurrentPage === 1}
+                  style={{
+                    padding: '7px 10px',
+                    borderRadius: '10px',
+                    border: 'var(--border)',
+                    background: safeCurrentPage === 1 ? 'rgba(15, 25, 35, 0.04)' : 'var(--color-white)',
+                    color: 'var(--color-text)',
+                    opacity: safeCurrentPage === 1 ? 0.45 : 1,
+                    cursor: safeCurrentPage === 1 ? 'default' : 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                  }}
+                >
+                  Назад
+                </button>
+                {pageNumbers.map(page => (
+                  <button
+                    key={page}
+                    type="button"
+                    onClick={() => setCurrentPage(page)}
+                    style={{
+                      minWidth: '34px',
+                      padding: '7px 10px',
+                      borderRadius: '10px',
+                      border: page === safeCurrentPage ? '1px solid var(--color-accent)' : 'var(--border)',
+                      background: page === safeCurrentPage ? 'rgba(165, 36, 47, 0.08)' : 'var(--color-white)',
+                      color: page === safeCurrentPage ? 'var(--color-accent)' : 'var(--color-text)',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {page}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
+                  disabled={safeCurrentPage === totalPages}
+                  style={{
+                    padding: '7px 10px',
+                    borderRadius: '10px',
+                    border: 'var(--border)',
+                    background: safeCurrentPage === totalPages ? 'rgba(15, 25, 35, 0.04)' : 'var(--color-white)',
+                    color: 'var(--color-text)',
+                    opacity: safeCurrentPage === totalPages ? 0.45 : 1,
+                    cursor: safeCurrentPage === totalPages ? 'default' : 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                  }}
+                >
+                  Вперед
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
