@@ -351,23 +351,35 @@ function SiteDetailPanel({ site }: { site: Site }) {
     <div style={{ width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
       {/* Header */}
       <div style={{
-        padding: '16px 20px', background: 'var(--color-dark)', color: 'var(--color-text-light)',
+        padding: '16px 20px',
+        background: 'var(--color-dark)',
+        color: 'var(--color-text-light)',
         borderBottom: '2px solid var(--color-accent)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-          <span style={{ fontSize: '11px', color: 'var(--color-accent)', fontWeight: 700 }}>{site.code}</span>
-          <StatusBadge status={site.status} />
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <StatusBadge status={site.status} size="xs" />
         </div>
-        <h3 style={{ fontSize: 'var(--text-lg)', margin: 0, overflowWrap: 'anywhere' }}>{site.name}</h3>
-        <p style={{
-          fontSize: '12px',
-          color: 'var(--color-secondary)',
-          margin: '4px 0 0',
-          opacity: 0.7,
+        <h3 style={{
+          fontSize: 'var(--text-lg)',
+          lineHeight: 1.05,
+          letterSpacing: '-0.02em',
+          fontWeight: 700,
+          margin: '10px 0 8px',
+          color: 'var(--color-text-light)',
           overflowWrap: 'anywhere',
         }}>
-          {site.address}
-        </p>
+          {site.name}
+        </h3>
+        <div style={{
+          fontSize: '11px',
+          lineHeight: 1,
+          letterSpacing: '0.03em',
+          fontWeight: 700,
+          textTransform: 'uppercase',
+          color: '#c29545',
+        }}>
+          {site.code}
+        </div>
       </div>
 
       {/* Image Preview */}

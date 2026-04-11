@@ -22,15 +22,15 @@ const STATUS_COLORS: Record<string, string> = {
 interface Props {
   status: string;
   label?: string;
-  size?: 'sm' | 'md';
+  size?: 'xs' | 'sm' | 'md';
 }
 
 export function StatusBadge({ status, label, size = 'sm' }: Props) {
   const color = STATUS_COLORS[status] || 'var(--color-status-no-data)';
   const text = label || statusLabel(status);
-  const px = size === 'sm' ? '8px' : '12px';
-  const py = size === 'sm' ? '2px' : '4px';
-  const fontSize = size === 'sm' ? 'var(--text-xs)' : 'var(--text-sm)';
+  const px = size === 'xs' ? '7px' : size === 'sm' ? '8px' : '12px';
+  const py = size === 'xs' ? '1px' : size === 'sm' ? '2px' : '4px';
+  const fontSize = size === 'xs' ? '11px' : size === 'sm' ? 'var(--text-xs)' : 'var(--text-sm)';
 
   return (
     <span style={{
