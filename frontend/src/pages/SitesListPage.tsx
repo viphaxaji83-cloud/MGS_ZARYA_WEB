@@ -116,7 +116,7 @@ export function SitesListPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, statusFilter, sortKey, sortDirection]);
+  }, [search, statusFilter]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
