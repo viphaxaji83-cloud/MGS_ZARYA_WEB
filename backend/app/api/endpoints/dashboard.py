@@ -29,7 +29,7 @@ async def get_summary(db: AsyncSession = Depends(get_db), user=Depends(get_curre
     cams_online = sum(1 for c in cams if c.status == "online")
     cams_offline = sum(1 for c in cams if c.status != "online")
 
-    alerts_result = await db.execute(select(func.count(Alert.id)).where(Alert.status.in_(["new", "viewed"])))
+    alerts_result = await db.execute(select(func.count(Alert.id)).where(Alert.status == "new"))
     active_alerts = alerts_result.scalar() or 0
 
     avg_fill = sum(s.fill_level for s in sites) / total if total > 0 else 0.0

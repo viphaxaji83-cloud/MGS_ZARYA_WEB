@@ -67,7 +67,7 @@ async def system_status(db: AsyncSession = Depends(get_db), admin: User = Depend
     )).scalar() or 0
 
     active_alerts = (await db.execute(
-        select(func.count(Alert.id)).where(Alert.status.in_(["new", "viewed"]))
+        select(func.count(Alert.id)).where(Alert.status == "new")
     )).scalar() or 0
 
     return SystemStatusResponse(

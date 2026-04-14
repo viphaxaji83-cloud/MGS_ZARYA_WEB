@@ -22,10 +22,10 @@
   --color-status-offline: #5a5652;
 
   /* Severity */
-  --color-severity-low: #c98a1a;
-  --color-severity-medium: #d97a1a;
-  --color-severity-high: #c94e2e;
-  --color-severity-critical: #c23b3b;
+  --color-severity-low: #7d8f63;
+  --color-severity-medium: #c29545;
+  --color-severity-high: #b86133;
+  --color-severity-critical: #882426;
 
   /* Functional */
   --color-success: #3a8c5c;

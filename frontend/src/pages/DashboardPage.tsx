@@ -355,7 +355,7 @@ export function DashboardPage() {
 function SiteDetailPanel({ site }: { site: Site }) {
   const { data: alerts = [] } = useQuery({
     queryKey: ['site-alerts', site.id],
-    queryFn: () => api.get<Alert[]>(`/sites/${site.id}/alerts?limit=5`),
+    queryFn: () => api.get<Alert[]>(`/sites/${site.id}/alerts?limit=3`),
   });
 
   const lowConfidence = site.ai_confidence > 0 && site.ai_confidence < 0.6;
@@ -480,7 +480,7 @@ function SiteDetailPanel({ site }: { site: Site }) {
           }}>
             Последние тревоги
           </div>
-          {alerts.map(a => (
+          {alerts.slice(0, 3).map(a => (
             <Link
               key={a.id}
               to={`/alerts?alertId=${a.id}`}

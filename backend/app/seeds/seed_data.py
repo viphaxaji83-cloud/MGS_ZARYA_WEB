@@ -7,6 +7,7 @@ import random
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import text
 
+from ..core.alert_rules import severity_for_alert_type
 from ..core.database import engine, async_session, Base
 from ..core.fill_levels import CRITICAL_FILL_LEVEL, WARNING_FILL_LEVEL, status_from_fill_level
 from ..core.security import hash_password
@@ -107,8 +108,7 @@ PLATFORM_SETTINGS = [
 ]
 
 ALERT_TYPES = ["overflow", "litter", "degradation", "camera_offline", "no_data", "ai_error"]
-ALERT_SEVERITIES = ["low", "medium", "high", "critical"]
-ALERT_STATUSES = ["new", "viewed", "confirmed", "closed", "false_positive"]
+ALERT_STATUSES = ["new", "confirmed", "false_positive"]
 ALERT_MESSAGES = {
     "overflow": "РћР±РЅР°СЂСѓР¶РµРЅРѕ РїРµСЂРµРїРѕР»РЅРµРЅРёРµ РєРѕРЅС‚РµР№РЅРµСЂРѕРІ",
     "litter": "РћР±РЅР°СЂСѓР¶РµРЅ РјСѓСЃРѕСЂ РІРЅРµ РєРѕРЅС‚РµР№РЅРµСЂРѕРІ",
@@ -249,15 +249,14 @@ async def seed():
             n_alerts = random.randint(0, 4)
             for _ in range(n_alerts):
                 a_type = random.choice(ALERT_TYPES)
-                severity_weights = {"low": 0.3, "medium": 0.4, "high": 0.2, "critical": 0.1}
-                severity = random.choices(list(severity_weights.keys()), weights=list(severity_weights.values()))[0]
-                a_status = random.choices(ALERT_STATUSES, weights=[0.3, 0.3, 0.15, 0.15, 0.1])[0]
+                severity = severity_for_alert_type(a_type)
+                a_status = random.choices(ALERT_STATUSES, weights=[0.55, 0.3, 0.15])[0]
                 hours_ago = random.uniform(0.5, 168)
                 alert = Alert(
                     site_id=site.id, type=a_type, severity=severity,
                     status=a_status, message=ALERT_MESSAGES[a_type],
                     created_at=now - timedelta(hours=hours_ago),
-                    acknowledged_by=users[1].id if a_status in ("confirmed", "closed") else None,
+                    acknowledged_by=users[1].id if a_status in ("confirmed", "false_positive") else None,
                 )
                 db.add(alert)
                 alert_count += 1

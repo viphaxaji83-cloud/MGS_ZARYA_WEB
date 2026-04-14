@@ -79,7 +79,7 @@ export interface Alert {
 
 export type AlertType = 'overflow' | 'litter' | 'degradation' | 'camera_offline' | 'no_data' | 'ai_error';
 export type AlertSeverity = 'low' | 'medium' | 'high' | 'critical';
-export type AlertStatus = 'new' | 'viewed' | 'confirmed' | 'closed' | 'false_positive';
+export type AlertStatus = 'new' | 'confirmed' | 'false_positive';
 
 export interface DashboardSummary {
   total_sites: number;

@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from ...core.alert_rules import severity_for_alert_type
 from ...core.database import async_session
 from ...core.fill_levels import status_from_fill_level
 from ...models.alert import Alert
@@ -58,7 +59,7 @@ async def live_simulator():
             alert_types = ["overflow", "litter", "degradation", "camera_offline"]
             alert_site_id = random.randint(1, 30)
             alert_type = random.choice(alert_types)
-            alert_severity = random.choice(["low", "medium", "high", "critical"])
+            alert_severity = severity_for_alert_type(alert_type)
             alert_created_at = datetime.now(timezone.utc)
             alert_message = "Автоматически обнаружено изменение состояния"
 

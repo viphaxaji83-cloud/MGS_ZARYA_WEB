@@ -10,23 +10,29 @@ const STATUS_COLORS: Record<string, string> = {
   error: 'var(--color-error)',
   maintenance: 'var(--color-status-warning)',
   new: 'var(--color-info)',
-  viewed: 'var(--color-status-warning)',
   confirmed: 'var(--color-status-normal)',
-  closed: 'var(--color-status-no-data)',
   false_positive: 'var(--color-status-offline)',
+  viewed: 'var(--color-info)',
+  closed: 'var(--color-status-normal)',
+};
+
+const SEVERITY_COLORS: Record<string, string> = {
   low: 'var(--color-severity-low)',
   medium: 'var(--color-severity-medium)',
   high: 'var(--color-severity-high)',
+  critical: 'var(--color-severity-critical)',
 };
 
 interface Props {
   status: string;
   label?: string;
   size?: 'xs' | 'sm' | 'md';
+  kind?: 'status' | 'severity';
 }
 
-export function StatusBadge({ status, label, size = 'sm' }: Props) {
-  const color = STATUS_COLORS[status] || 'var(--color-status-no-data)';
+export function StatusBadge({ status, label, size = 'sm', kind = 'status' }: Props) {
+  const palette = kind === 'severity' ? SEVERITY_COLORS : STATUS_COLORS;
+  const color = palette[status] || 'var(--color-status-no-data)';
   const text = label || statusLabel(status);
   const px = size === 'xs' ? '7px' : size === 'sm' ? '8px' : '12px';
   const py = size === 'xs' ? '1px' : size === 'sm' ? '2px' : '4px';

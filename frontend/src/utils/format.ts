@@ -1,7 +1,13 @@
 export function formatDate(iso: string | null | undefined): string {
   if (!iso) return '—';
   const d = new Date(iso);
-  return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 export function formatTimeAgo(iso: string | null | undefined): string {
@@ -45,10 +51,10 @@ export function alertTypeLabel(type: string): string {
 export function alertStatusLabel(status: string): string {
   const map: Record<string, string> = {
     new: 'Новый',
-    viewed: 'Просмотрен',
     confirmed: 'Подтверждён',
-    closed: 'Закрыт',
     false_positive: 'Ложный',
+    viewed: 'Новый',
+    closed: 'Подтверждён',
   };
   return map[status] || status;
 }

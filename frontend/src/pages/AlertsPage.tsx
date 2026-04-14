@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
+
 import { api } from '@/api/client';
-import { StatusBadge } from '@/components/ui/StatusBadge';
-import { Loader } from '@/components/ui/Loader';
 import { Button } from '@/components/ui/Button';
+import { Loader } from '@/components/ui/Loader';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useToastStore } from '@/components/ui/Toast';
-import { formatDate, alertStatusLabel, alertTypeLabel, severityLabel } from '@/utils/format';
 import type { Alert } from '@/types';
+import { alertStatusLabel, alertTypeLabel, formatDate, severityLabel } from '@/utils/format';
 
 type SortKey = 'id' | 'type' | 'severity' | 'status' | 'message' | 'site_id' | 'created_at';
 type SortDirection = 'asc' | 'desc';
@@ -19,12 +20,17 @@ const ALERT_SEVERITY_ORDER: Record<Alert['severity'], number> = {
   critical: 3,
 };
 
+const ALERT_SEVERITY_ACCENT: Record<Alert['severity'], string> = {
+  low: 'var(--color-severity-low)',
+  medium: 'var(--color-severity-medium)',
+  high: 'var(--color-severity-high)',
+  critical: 'var(--color-severity-critical)',
+};
+
 const ALERT_STATUS_ORDER: Record<Alert['status'], number> = {
   new: 0,
-  viewed: 1,
-  confirmed: 2,
-  closed: 3,
-  false_positive: 4,
+  confirmed: 1,
+  false_positive: 2,
 };
 
 const TABLE_HEADERS: Array<{ label: string; sortKey?: SortKey }> = [
@@ -38,6 +44,8 @@ const TABLE_HEADERS: Array<{ label: string; sortKey?: SortKey }> = [
   { label: 'Действия' },
 ];
 
+const ALERT_TYPE_OPTIONS = ['overflow', 'litter', 'degradation', 'camera_offline', 'no_data', 'ai_error'];
+const ALERT_STATUS_OPTIONS: Alert['status'][] = ['new', 'confirmed', 'false_positive'];
 const ROWS_PER_PAGE = 15;
 const ALERT_HIGHLIGHT_DURATION_MS = 2200;
 
@@ -56,7 +64,7 @@ export function AlertsPage() {
   const [searchParams] = useSearchParams();
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [sortKey, setSortKey] = useState<SortKey>('created_at');
+  const [sortKey, setSortKey] = useState<SortKey>('severity');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [expandedMessageIds, setExpandedMessageIds] = useState<number[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -95,7 +103,8 @@ export function AlertsPage() {
         result = ALERT_SEVERITY_ORDER[a.severity] - ALERT_SEVERITY_ORDER[b.severity];
         break;
       case 'status':
-        result = ALERT_STATUS_ORDER[a.status] - ALERT_STATUS_ORDER[b.status];
+        result = (ALERT_STATUS_ORDER[a.status] ?? Number.MAX_SAFE_INTEGER)
+          - (ALERT_STATUS_ORDER[b.status] ?? Number.MAX_SAFE_INTEGER);
         break;
       case 'message':
         result = compareText(a.message, b.message);
@@ -106,6 +115,15 @@ export function AlertsPage() {
       case 'created_at':
         result = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
         break;
+    }
+
+    if (result === 0 && sortKey === 'severity') {
+      result = (ALERT_STATUS_ORDER[a.status] ?? Number.MAX_SAFE_INTEGER)
+        - (ALERT_STATUS_ORDER[b.status] ?? Number.MAX_SAFE_INTEGER);
+    }
+
+    if (result === 0) {
+      result = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
     }
 
     if (result === 0) {
@@ -124,7 +142,7 @@ export function AlertsPage() {
   const pageNumbers = Array.from({ length: totalPages }, (_, index) => index + 1);
 
   const updateAlert = useMutation({
-    mutationFn: ({ id, status }: { id: number; status: string }) =>
+    mutationFn: ({ id, status }: { id: number; status: Alert['status'] }) =>
       api.patch(`/alerts/${id}`, { status }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['alerts'] });
@@ -132,11 +150,11 @@ export function AlertsPage() {
     },
   });
 
-  const countByStatus = (status: string) => alerts.filter(alert => alert.status === status).length;
+  const countByStatus = (status: Alert['status']) => alerts.filter(alert => alert.status === status).length;
 
   const handleSort = (nextSortKey: SortKey) => {
     if (sortKey === nextSortKey) {
-      setSortDirection(currentDirection => currentDirection === 'asc' ? 'desc' : 'asc');
+      setSortDirection(currentDirection => (currentDirection === 'asc' ? 'desc' : 'asc'));
       return;
     }
 
@@ -173,13 +191,13 @@ export function AlertsPage() {
     }
   }, [currentPage, totalPages]);
 
-  useEffect(() => {
-    return () => {
+  useEffect(() => (
+    () => {
       if (clearHighlightTimeoutRef.current) {
         window.clearTimeout(clearHighlightTimeoutRef.current);
       }
-    };
-  }, []);
+    }
+  ), []);
 
   useEffect(() => {
     if (!focusAlertId || sortedAlerts.length === 0) {
@@ -232,9 +250,8 @@ export function AlertsPage() {
       <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
         {[
           { label: 'Новые', count: countByStatus('new'), color: 'var(--color-status-critical)' },
-          { label: 'Просмотр.', count: countByStatus('viewed'), color: 'var(--color-status-warning)' },
           { label: 'Подтвержд.', count: countByStatus('confirmed'), color: 'var(--color-status-normal)' },
-          { label: 'Закрыт.', count: countByStatus('closed'), color: 'var(--color-status-no-data)' },
+          { label: 'Ложные', count: countByStatus('false_positive'), color: 'var(--color-status-offline)' },
         ].map(counter => (
           <div
             key={counter.label}
@@ -270,12 +287,13 @@ export function AlertsPage() {
           }}
         >
           <option value="">Все типы</option>
-          {['overflow', 'litter', 'degradation', 'camera_offline', 'no_data', 'ai_error'].map(type => (
+          {ALERT_TYPE_OPTIONS.map(type => (
             <option key={type} value={type}>
               {alertTypeLabel(type)}
             </option>
           ))}
         </select>
+
         <select
           value={statusFilter}
           onChange={event => setStatusFilter(event.target.value)}
@@ -289,7 +307,7 @@ export function AlertsPage() {
           }}
         >
           <option value="">Все статусы</option>
-          {['new', 'viewed', 'confirmed', 'closed', 'false_positive'].map(status => (
+          {ALERT_STATUS_OPTIONS.map(status => (
             <option key={status} value={status}>
               {alertStatusLabel(status)}
             </option>
@@ -357,7 +375,7 @@ export function AlertsPage() {
                             transition: 'transform 0.15s ease',
                           }}
                         >
-                          ▲
+                          ▼
                         </span>
                       </button>
                     ) : (
@@ -372,6 +390,7 @@ export function AlertsPage() {
                 const message = alert.message?.trim() || '—';
                 const isExpanded = expandedMessageIds.includes(alert.id);
                 const canExpandMessage = message.length > 90;
+                const severityAccent = ALERT_SEVERITY_ACCENT[alert.severity] || 'var(--color-muted)';
 
                 return (
                   <tr
@@ -380,14 +399,16 @@ export function AlertsPage() {
                     style={{
                       borderBottom: '1px solid var(--color-muted)',
                       background: highlightedAlertId === alert.id ? 'rgba(165, 36, 47, 0.08)' : 'transparent',
-                      boxShadow: highlightedAlertId === alert.id ? 'inset 3px 0 0 var(--color-accent)' : 'none',
+                      boxShadow: highlightedAlertId === alert.id
+                        ? 'inset 4px 0 0 var(--color-accent)'
+                        : `inset 3px 0 0 ${severityAccent}`,
                       transition: 'background 0.2s ease, box-shadow 0.2s ease',
                     }}
                   >
                     <td style={{ padding: '10px 14px', fontWeight: 600 }}>#{alert.id}</td>
                     <td style={{ padding: '10px 14px' }}>{alertTypeLabel(alert.type)}</td>
                     <td style={{ padding: '10px 14px' }}>
-                      <StatusBadge status={alert.severity} label={severityLabel(alert.severity)} />
+                      <StatusBadge status={alert.severity} label={severityLabel(alert.severity)} kind="severity" />
                     </td>
                     <td style={{ padding: '10px 14px' }}>
                       <StatusBadge status={alert.status} label={alertStatusLabel(alert.status)} />
@@ -460,6 +481,7 @@ export function AlertsPage() {
               })}
             </tbody>
           </table>
+
           {totalPages > 1 && (
             <div
               style={{

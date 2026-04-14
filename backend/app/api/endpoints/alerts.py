@@ -11,6 +11,12 @@ from ...schemas.alert import AlertResponse, AlertUpdate
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
+ALERT_STATUS_ALIASES = {
+    "viewed": "new",
+    "closed": "confirmed",
+}
+ALLOWED_ALERT_STATUSES = {"new", "confirmed", "false_positive"}
+
 
 @router.get("", response_model=list[AlertResponse])
 async def list_alerts(
@@ -23,6 +29,11 @@ async def list_alerts(
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
+    if status:
+        status = ALERT_STATUS_ALIASES.get(status, status)
+        if status not in ALLOWED_ALERT_STATUSES:
+            raise HTTPException(status_code=400, detail="Unsupported alert status")
+
     q = select(Alert)
     if type:
         q = q.where(Alert.type == type)
@@ -47,8 +58,12 @@ async def update_alert(
         raise HTTPException(status_code=404, detail="Alert not found")
 
     if body.status:
-        alert.status = body.status
-        if body.status in ("confirmed", "closed", "false_positive"):
+        normalized_status = ALERT_STATUS_ALIASES.get(body.status, body.status)
+        if normalized_status not in ALLOWED_ALERT_STATUSES:
+            raise HTTPException(status_code=400, detail="Unsupported alert status")
+
+        alert.status = normalized_status
+        if normalized_status in ("confirmed", "false_positive"):
             alert.acknowledged_by = user.id
     await db.commit()
     await db.refresh(alert)
