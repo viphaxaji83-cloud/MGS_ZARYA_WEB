@@ -113,6 +113,15 @@ input, select, textarea {
   z-index: 0;
 }
 
+.landing-grid-bg {
+  background-color: var(--color-bg);
+  background-image:
+    linear-gradient(rgba(232, 230, 225, 0.42) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232, 230, 225, 0.42) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-position: top left;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

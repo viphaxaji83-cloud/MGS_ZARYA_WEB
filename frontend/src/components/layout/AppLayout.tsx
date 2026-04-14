@@ -24,7 +24,7 @@ export function AppLayout() {
   const { connected } = useWebSocket(handleWsMessage);
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+    <div className="landing-grid-bg" style={{ minHeight: '100vh' }}>
       <TopBar wsConnected={connected} />
       <main style={{ paddingTop: 'var(--topbar-height)' }}>
         <Outlet />
