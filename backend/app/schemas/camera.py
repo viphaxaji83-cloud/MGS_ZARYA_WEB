@@ -15,6 +15,7 @@ class CameraCreate(CameraBase):
 
 
 class CameraUpdate(BaseModel):
+    code: Optional[str] = None
     name: Optional[str] = None
     source_url: Optional[str] = None
     status: Optional[str] = None

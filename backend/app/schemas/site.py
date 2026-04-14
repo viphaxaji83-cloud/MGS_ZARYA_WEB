@@ -20,6 +20,7 @@ class SiteCreate(SiteBase):
 
 
 class SiteUpdate(BaseModel):
+    code: Optional[str] = None
     name: Optional[str] = None
     address: Optional[str] = None
     district: Optional[str] = None

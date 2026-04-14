@@ -1,21 +1,26 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 
 
 class UserCreate(BaseModel):
-    name: str
-    email: str
-    login: str
-    password: str
+    name: str = Field(min_length=2, max_length=255)
+    email: str = Field(min_length=3, max_length=255)
+    login: str = Field(min_length=3, max_length=100)
+    password: str = Field(min_length=8, max_length=72)
     role: str = "operator"
 
 
 class UserUpdate(BaseModel):
-    name: Optional[str] = None
-    email: Optional[str] = None
+    name: Optional[str] = Field(default=None, min_length=2, max_length=255)
+    email: Optional[str] = Field(default=None, min_length=3, max_length=255)
+    login: Optional[str] = Field(default=None, min_length=3, max_length=100)
     role: Optional[str] = None
     is_active: Optional[bool] = None
+
+
+class UserPasswordSet(BaseModel):
+    password: str = Field(min_length=8, max_length=72)
 
 
 class UserResponse(BaseModel):
