@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, api } from '@/api/client';
-import { StatusBadge } from '@/components/ui/StatusBadge';
+import { YandexLocationPicker, geocodeAddress } from '@/components/map/YandexLocationPicker';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Modal } from '@/components/ui/Modal';
 import { Loader } from '@/components/ui/Loader';
+import { Modal } from '@/components/ui/Modal';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useToastStore } from '@/components/ui/Toast';
 import type { Site } from '@/types';
 
@@ -20,6 +21,8 @@ type SiteFormState = {
 };
 
 const TABLE_HEADERS = ['Код', 'Название', 'Адрес', 'Район', 'Статус', 'Камера', 'Активна', 'Действия'];
+const DEFAULT_SITE_LAT = 44.6078;
+const DEFAULT_SITE_LON = 40.1058;
 
 function emptySiteForm(): SiteFormState {
   return {
@@ -27,8 +30,8 @@ function emptySiteForm(): SiteFormState {
     name: '',
     address: '',
     district: '',
-    lat: '44.6078',
-    lon: '40.1058',
+    lat: DEFAULT_SITE_LAT.toFixed(6),
+    lon: DEFAULT_SITE_LON.toFixed(6),
     container_count: '4',
   };
 }
@@ -45,15 +48,39 @@ function buildSiteForm(site: Site): SiteFormState {
   };
 }
 
+function parseCoordinateValue(value: string, fallback: number) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function isDefaultCoordinates(lat: string, lon: string) {
+  return (
+    parseCoordinateValue(lat, DEFAULT_SITE_LAT).toFixed(6) === DEFAULT_SITE_LAT.toFixed(6) &&
+    parseCoordinateValue(lon, DEFAULT_SITE_LON).toFixed(6) === DEFAULT_SITE_LON.toFixed(6)
+  );
+}
+
 function normalizeSitePayload(form: SiteFormState) {
+  const lat = Number(form.lat);
+  const lon = Number(form.lon);
+  const containerCount = Number(form.container_count);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    throw new Error('Укажите корректные координаты площадки');
+  }
+
+  if (!Number.isInteger(containerCount) || containerCount < 0) {
+    throw new Error('Количество контейнеров должно быть целым числом не меньше нуля');
+  }
+
   return {
     code: form.code.trim().toUpperCase(),
     name: form.name.trim(),
     address: form.address.trim(),
     district: form.district.trim() || null,
-    lat: parseFloat(form.lat),
-    lon: parseFloat(form.lon),
-    container_count: parseInt(form.container_count, 10),
+    lat,
+    lon,
+    container_count: containerCount,
   };
 }
 
@@ -69,6 +96,10 @@ function getApiErrorMessage(error: unknown, fallback: string) {
     if (error.body) {
       return error.body;
     }
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message;
   }
 
   return fallback;
@@ -115,6 +146,22 @@ export function AdminSitesPage() {
     },
     onError: error => addToast(getApiErrorMessage(error, 'Не удалось удалить площадку'), 'error'),
   });
+
+  const submitCreate = (form: SiteFormState) => {
+    try {
+      createSite.mutate(normalizeSitePayload(form));
+    } catch (error) {
+      addToast(getApiErrorMessage(error, 'Не удалось создать площадку'), 'error');
+    }
+  };
+
+  const submitUpdate = (siteId: number, form: SiteFormState) => {
+    try {
+      updateSite.mutate({ siteId, body: normalizeSitePayload(form) });
+    } catch (error) {
+      addToast(getApiErrorMessage(error, 'Не удалось сохранить площадку'), 'error');
+    }
+  };
 
   const handleDelete = (site: Site) => {
     if (!window.confirm(`Удалить площадку "${site.code}"? Связанные наблюдения и тревоги тоже будут удалены.`)) {
@@ -234,7 +281,7 @@ export function AdminSitesPage() {
         submitLabel="Создать"
         isSaving={createSite.isPending}
         initialForm={emptySiteForm()}
-        onSubmit={form => createSite.mutate(normalizeSitePayload(form))}
+        onSubmit={submitCreate}
       />
 
       <SiteModal
@@ -245,8 +292,11 @@ export function AdminSitesPage() {
         isSaving={updateSite.isPending}
         initialForm={editingSite ? buildSiteForm(editingSite) : emptySiteForm()}
         onSubmit={form => {
-          if (!editingSite) return;
-          updateSite.mutate({ siteId: editingSite.id, body: normalizeSitePayload(form) });
+          if (!editingSite) {
+            return;
+          }
+
+          submitUpdate(editingSite.id, form);
         }}
       />
     </div>
@@ -270,20 +320,90 @@ function SiteModal({
   initialForm: SiteFormState;
   onSubmit: (form: SiteFormState) => void;
 }) {
+  const addToast = useToastStore(s => s.add);
   const [form, setForm] = useState<SiteFormState>(initialForm);
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const [geocodeNote, setGeocodeNote] = useState<string | null>(null);
+  const lastAutoGeocodeAddressRef = useRef<string>('');
 
   useEffect(() => {
     if (open) {
       setForm(initialForm);
+      setIsGeocoding(false);
+      setGeocodeNote(null);
+      lastAutoGeocodeAddressRef.current = '';
     }
   }, [initialForm, open]);
 
   const setField = (key: keyof SiteFormState, value: string) => {
     setForm(prev => ({ ...prev, [key]: value }));
+    if (key === 'address') {
+      setGeocodeNote(null);
+    }
+  };
+
+  const pickerLat = useMemo(() => parseCoordinateValue(form.lat, DEFAULT_SITE_LAT), [form.lat]);
+  const pickerLon = useMemo(() => parseCoordinateValue(form.lon, DEFAULT_SITE_LON), [form.lon]);
+
+  const updateCoordinates = ({ lat, lon }: { lat: number; lon: number }) => {
+    setForm(prev => ({
+      ...prev,
+      lat: lat.toFixed(6),
+      lon: lon.toFixed(6),
+    }));
+  };
+
+  const geocodeCurrentAddress = async (mode: 'manual' | 'auto') => {
+    const address = form.address.trim();
+    if (!address || isGeocoding) {
+      return;
+    }
+
+    setIsGeocoding(true);
+    if (mode === 'manual') {
+      setGeocodeNote('Ищу адрес на карте...');
+    }
+
+    try {
+      const coords = await geocodeAddress(address);
+      updateCoordinates(coords);
+      setGeocodeNote(`Точка обновлена по адресу: ${coords.query}`);
+      lastAutoGeocodeAddressRef.current = address;
+
+      if (mode === 'manual') {
+        addToast('Координаты определены по адресу', 'success');
+      }
+    } catch (error) {
+      const message = getApiErrorMessage(error, 'Не удалось определить координаты по адресу');
+      setGeocodeNote(message);
+
+      if (mode === 'manual') {
+        addToast(message, 'error');
+      }
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
+
+  const handleAddressBlur = () => {
+    const address = form.address.trim();
+    if (!address) {
+      return;
+    }
+
+    if (!isDefaultCoordinates(form.lat, form.lon)) {
+      return;
+    }
+
+    if (lastAutoGeocodeAddressRef.current === address) {
+      return;
+    }
+
+    void geocodeCurrentAddress('auto');
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={title} width={560}>
+    <Modal open={open} onClose={onClose} title={title} width={760}>
       <form
         onSubmit={event => {
           event.preventDefault();
@@ -295,13 +415,76 @@ function SiteModal({
           <Input label="Код" value={form.code} onChange={event => setField('code', event.target.value)} required placeholder="MKP-031" />
           <Input label="Район" value={form.district} onChange={event => setField('district', event.target.value)} placeholder="Центральный" />
         </div>
+
         <Input label="Название" value={form.name} onChange={event => setField('name', event.target.value)} required />
-        <Input label="Адрес" value={form.address} onChange={event => setField('address', event.target.value)} required />
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '10px', alignItems: 'end' }}>
+          <Input
+            label="Адрес"
+            value={form.address}
+            onChange={event => setField('address', event.target.value)}
+            onBlur={handleAddressBlur}
+            required
+          />
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isGeocoding || !form.address.trim()}
+            style={{ minWidth: '168px' }}
+            onClick={() => void geocodeCurrentAddress('manual')}
+          >
+            {isGeocoding ? 'Поиск...' : 'Найти по адресу'}
+          </Button>
+        </div>
+
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            padding: '12px',
+            borderRadius: 'var(--radius)',
+            border: 'var(--border)',
+            background: 'var(--color-bg)',
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontSize: 'var(--text-xs)',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                opacity: 0.7,
+                marginBottom: '4px',
+              }}
+            >
+              Точка на карте
+            </div>
+            <div style={{ fontSize: 'var(--text-sm)', opacity: 0.7, lineHeight: 1.45 }}>
+              Можно поставить точку вручную на карте или определить её по адресу. После автопоиска маркер тоже можно подвинуть вручную.
+            </div>
+          </div>
+
+          <YandexLocationPicker lat={pickerLat} lon={pickerLon} onChange={updateCoordinates} />
+
+          <div style={{ fontSize: 'var(--text-xs)', opacity: 0.65 }}>
+            Текущая точка: {pickerLat.toFixed(6)}, {pickerLon.toFixed(6)}
+          </div>
+
+          {geocodeNote && (
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-accent)', lineHeight: 1.45 }}>
+              {geocodeNote}
+            </div>
+          )}
+        </div>
+
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
           <Input label="Широта" type="number" step="any" value={form.lat} onChange={event => setField('lat', event.target.value)} required />
           <Input label="Долгота" type="number" step="any" value={form.lon} onChange={event => setField('lon', event.target.value)} required />
           <Input label="Контейнеры" type="number" min="0" value={form.container_count} onChange={event => setField('container_count', event.target.value)} required />
         </div>
+
         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px' }}>
           <Button variant="outline" type="button" onClick={onClose}>
             Отмена

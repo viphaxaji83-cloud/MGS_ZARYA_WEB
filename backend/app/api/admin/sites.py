@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import delete, select
 from typing import Optional
+import httpx
 
 from ...core.database import get_db
 from ...core.deps import require_admin
@@ -30,6 +31,57 @@ async def _get_site_by_code(db: AsyncSession, code: str, *, exclude_id: Optional
         query = query.where(Site.id != exclude_id)
     result = await db.execute(query)
     return result.scalar_one_or_none()
+
+
+@router.get("/geocode")
+async def geocode_site_address(
+    address: str,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    query = address.strip()
+    if not query:
+        raise HTTPException(status_code=400, detail="Address is required")
+
+    candidates: list[str] = [query]
+    if "майкоп" not in query.lower():
+        candidates.append(f"{query}, Майкоп")
+
+    params = {
+        "format": "jsonv2",
+        "limit": 1,
+        "countrycodes": "ru",
+        "addressdetails": 1,
+    }
+    headers = {
+        "User-Agent": "ZaryaPlatform/1.0",
+        "Accept-Language": "ru",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0, headers=headers, follow_redirects=True) as client:
+            for candidate in dict.fromkeys(candidates):
+                response = await client.get(
+                    "https://nominatim.openstreetmap.org/search",
+                    params={**params, "q": candidate},
+                )
+                response.raise_for_status()
+                data = response.json()
+
+                if not data:
+                    continue
+
+                item = data[0]
+                return {
+                    "lat": float(item["lat"]),
+                    "lon": float(item["lon"]),
+                    "query": candidate,
+                    "resolved_address": item.get("display_name"),
+                }
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail="Geocoding service is unavailable") from exc
+
+    raise HTTPException(status_code=404, detail="Coordinates not found for this address")
 
 
 @router.get("", response_model=list[SiteResponse])
