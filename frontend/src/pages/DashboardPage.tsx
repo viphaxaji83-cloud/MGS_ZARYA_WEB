@@ -8,10 +8,11 @@ import { FillBar } from '@/components/ui/FillBar';
 import { Card } from '@/components/ui/Card';
 import { ResizeHandle } from '@/components/ui/ResizeHandle';
 import { Loader, Skeleton } from '@/components/ui/Loader';
+import { ToastContainer } from '@/components/ui/Toast';
 import { useElementWidth } from '@/hooks/useElementWidth';
 import { useResizableWidth } from '@/hooks/useResizableWidth';
 import { useAppStore } from '@/stores/appStore';
-import { formatTimeAgo, statusLabel } from '@/utils/format';
+import { alertStatusLabel, formatTimeAgo, statusLabel } from '@/utils/format';
 import type { Site, DashboardSummary, Alert } from '@/types';
 
 type FilterTab = 'all' | 'critical' | 'warning' | 'offline' | 'no_data';
@@ -267,6 +268,18 @@ export function DashboardPage() {
       />
       <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', position: 'relative' }}>
         <YandexMap sites={filteredSites} selectedSiteId={selectedSiteId} onSiteClick={setSelectedSite} />
+        <ToastContainer
+          placements={['dashboard-map']}
+          style={{
+            position: 'absolute',
+            right: '18px',
+            bottom: '72px',
+            top: 'auto',
+            alignItems: 'flex-end',
+            zIndex: 15,
+            pointerEvents: 'none',
+          }}
+        />
 
         {/* Summary overlay */}
         {summary && (
@@ -473,7 +486,7 @@ function SiteDetailPanel({ site }: { site: Site }) {
               fontSize: '12px', display: 'flex', justifyContent: 'space-between',
             }}>
               <span style={{ minWidth: 0, marginRight: '12px', overflowWrap: 'anywhere' }}>{a.message || a.type}</span>
-              <StatusBadge status={a.status} size="sm" />
+              <StatusBadge status={a.status} label={alertStatusLabel(a.status)} size="sm" />
             </div>
           ))}
         </div>

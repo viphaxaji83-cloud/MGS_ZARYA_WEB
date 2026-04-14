@@ -13,6 +13,55 @@ const STATUS_COLORS: Record<string, string> = {
   offline: '#5a5652',
 };
 
+const MAP_VIEWPORT_STORAGE_KEY = 'dashboard-map-viewport-v1';
+const DEFAULT_MAP_CENTER: [number, number] = [44.6078, 40.1058];
+const DEFAULT_MAP_ZOOM = 13;
+
+function readStoredViewport() {
+  try {
+    const raw = window.localStorage.getItem(MAP_VIEWPORT_STORAGE_KEY);
+    if (!raw) {
+      return { center: DEFAULT_MAP_CENTER, zoom: DEFAULT_MAP_ZOOM };
+    }
+
+    const parsed = JSON.parse(raw) as { center?: number[]; zoom?: number };
+    const center = parsed.center;
+    const zoom = parsed.zoom;
+
+    if (
+      Array.isArray(center) &&
+      center.length === 2 &&
+      typeof center[0] === 'number' &&
+      typeof center[1] === 'number' &&
+      typeof zoom === 'number'
+    ) {
+      return { center: [center[0], center[1]] as [number, number], zoom };
+    }
+  } catch {}
+
+  return { center: DEFAULT_MAP_CENTER, zoom: DEFAULT_MAP_ZOOM };
+}
+
+function persistViewport(map: any) {
+  try {
+    const center = map?.getCenter?.();
+    const zoom = map?.getZoom?.();
+
+    if (
+      Array.isArray(center) &&
+      center.length === 2 &&
+      typeof center[0] === 'number' &&
+      typeof center[1] === 'number' &&
+      typeof zoom === 'number'
+    ) {
+      window.localStorage.setItem(
+        MAP_VIEWPORT_STORAGE_KEY,
+        JSON.stringify({ center, zoom }),
+      );
+    }
+  } catch {}
+}
+
 interface Props {
   sites: Site[];
   selectedSiteId: number | null;
@@ -26,6 +75,7 @@ export function YandexMap({ sites, selectedSiteId, onSiteClick }: Props) {
   const sitesRef = useRef(sites);
   const selectedSiteIdRef = useRef(selectedSiteId);
   const onSiteClickRef = useRef(onSiteClick);
+  const hasMountedRef = useRef(false);
 
   const updateMarkers = useCallback(() => {
     if (!mapInstance.current || !window.ymaps) return;
@@ -83,16 +133,20 @@ export function YandexMap({ sites, selectedSiteId, onSiteClick }: Props) {
     });
   }, []);
 
-  const centerOnSelectedSite = useCallback(() => {
-    if (!mapInstance.current) return;
+  const centerOnSite = useCallback((siteId: number | null) => {
+    if (!mapInstance.current || !siteId) return;
 
-    const currentSelectedSiteId = selectedSiteIdRef.current;
-    if (!currentSelectedSiteId) return;
-
-    const site = sitesRef.current.find(item => item.id === currentSelectedSiteId);
+    const site = sitesRef.current.find(item => item.id === siteId);
     if (site) {
       mapInstance.current.setCenter([site.lat, site.lon], 15, { duration: 300 });
     }
+  }, []);
+
+  const resetToDefaultViewport = useCallback(() => {
+    if (!mapInstance.current) return;
+
+    mapInstance.current.setCenter(DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM, { duration: 300 });
+    window.setTimeout(() => persistViewport(mapInstance.current), 320);
   }, []);
 
   const initMap = useCallback(() => {
@@ -100,19 +154,28 @@ export function YandexMap({ sites, selectedSiteId, onSiteClick }: Props) {
 
     window.ymaps.ready(() => {
       if (!mapRef.current || mapInstance.current) return;
+      const hasStoredViewport = Boolean(window.localStorage.getItem(MAP_VIEWPORT_STORAGE_KEY));
+      const initialViewport = readStoredViewport();
 
       mapInstance.current = new window.ymaps.Map(mapRef.current, {
-        center: [44.6078, 40.1058],
-        zoom: 13,
+        center: initialViewport.center,
+        zoom: initialViewport.zoom,
         controls: ['zoomControl', 'geolocationControl'],
       }, {
         suppressMapOpenBlock: true,
       });
 
+      mapInstance.current.events.add('boundschange', () => {
+        persistViewport(mapInstance.current);
+      });
+
       updateMarkers();
-      centerOnSelectedSite();
+      if (!hasStoredViewport && selectedSiteIdRef.current !== null) {
+        centerOnSite(selectedSiteIdRef.current);
+      }
+      persistViewport(mapInstance.current);
     });
-  }, [centerOnSelectedSite, updateMarkers]);
+  }, [centerOnSite, updateMarkers]);
 
   useEffect(() => {
     // Load Yandex Maps API if not loaded
@@ -135,14 +198,29 @@ export function YandexMap({ sites, selectedSiteId, onSiteClick }: Props) {
 
     if (mapInstance.current) {
       updateMarkers();
-      centerOnSelectedSite();
     }
-  }, [sites, selectedSiteId, onSiteClick, updateMarkers, centerOnSelectedSite]);
+  }, [sites, selectedSiteId, onSiteClick, updateMarkers]);
 
-  // Pan to selected site
   useEffect(() => {
-    centerOnSelectedSite();
-  }, [selectedSiteId, sites, centerOnSelectedSite]);
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
+
+    if (selectedSiteId !== null) {
+      centerOnSite(selectedSiteId);
+    }
+  }, [selectedSiteId, centerOnSite]);
+
+  useEffect(() => {
+    return () => {
+      if (mapInstance.current) {
+        persistViewport(mapInstance.current);
+        mapInstance.current.destroy?.();
+        mapInstance.current = null;
+      }
+    };
+  }, []);
 
   // Keep map in sync with container size (panel resize, window resize)
   useEffect(() => {
@@ -157,6 +235,36 @@ export function YandexMap({ sites, selectedSiteId, onSiteClick }: Props) {
   }, []);
 
   return (
-    <div ref={mapRef} style={{ width: '100%', height: '100%', borderRadius: 'var(--radius)' }} />
+    <div style={{ width: '100%', height: '100%', borderRadius: 'var(--radius)', position: 'relative', overflow: 'hidden' }}>
+      <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
+      <button
+        type="button"
+        onClick={resetToDefaultViewport}
+        style={{
+          position: 'absolute',
+          top: '12px',
+          right: '12px',
+          zIndex: 10,
+          padding: '6px 12px',
+          borderRadius: 'var(--radius-sm)',
+          border: 'none',
+          background: 'var(--color-dark)',
+          color: 'var(--color-text-light)',
+          fontSize: '11px',
+          fontWeight: 600,
+          lineHeight: 1.1,
+          textTransform: 'uppercase',
+          letterSpacing: '0.03em',
+          cursor: 'pointer',
+          boxShadow: 'var(--shadow-sm)',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+        title="Вернуться к базовой точке"
+      >
+        К центру
+      </button>
+    </div>
   );
 }

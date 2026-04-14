@@ -1,24 +1,27 @@
 import { create } from 'zustand';
-import { useEffect } from 'react';
+import type { CSSProperties } from 'react';
+
+export type ToastPlacement = 'default' | 'dashboard-map';
 
 interface ToastItem {
   id: number;
   message: string;
   type: 'success' | 'error' | 'info';
+  placement: ToastPlacement;
 }
 
 interface ToastState {
   toasts: ToastItem[];
-  add: (message: string, type?: 'success' | 'error' | 'info') => void;
+  add: (message: string, type?: 'success' | 'error' | 'info', placement?: ToastPlacement) => void;
   remove: (id: number) => void;
 }
 
 let nextId = 0;
 export const useToastStore = create<ToastState>((set) => ({
   toasts: [],
-  add: (message, type = 'info') => {
+  add: (message, type = 'info', placement = 'default') => {
     const id = ++nextId;
-    set(s => ({ toasts: [...s.toasts, { id, message, type }] }));
+    set(s => ({ toasts: [...s.toasts, { id, message, type, placement }] }));
     setTimeout(() => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })), 4000);
   },
   remove: (id) => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })),
@@ -30,15 +33,24 @@ const TYPE_COLORS = {
   info: 'var(--color-info)',
 };
 
-export function ToastContainer() {
+interface ToastContainerProps {
+  placements?: ToastPlacement[];
+  style?: CSSProperties;
+}
+
+export function ToastContainer({ placements = ['default'], style }: ToastContainerProps) {
   const toasts = useToastStore(s => s.toasts);
+  const visibleToasts = toasts.filter(toast => placements.includes(toast.placement));
+
+  if (visibleToasts.length === 0) return null;
 
   return (
     <div style={{
-      position: 'fixed', top: 16, right: 16, zIndex: 2000,
+      position: 'fixed', top: 'calc(var(--topbar-height) + 12px)', right: 16, zIndex: 2000,
       display: 'flex', flexDirection: 'column', gap: '8px',
+      ...style,
     }}>
-      {toasts.map(t => (
+      {visibleToasts.map(t => (
         <div key={t.id} style={{
           background: 'var(--color-dark)', color: 'var(--color-text-light)',
           padding: '12px 20px', borderRadius: 'var(--radius)',
