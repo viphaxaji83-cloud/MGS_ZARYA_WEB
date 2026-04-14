@@ -56,7 +56,7 @@ export function AdminLayout() {
               end={link.exact}
               style={({ isActive }) => ({
                 padding: '10px 20px', fontSize: 'var(--text-sm)', fontWeight: 500,
-                color: isActive ? 'var(--color-accent)' : 'var(--color-secondary)',
+                color: isActive ? 'var(--color-accent)' : 'var(--color-text-light)',
                 textDecoration: 'none', borderLeft: isActive ? '3px solid var(--color-accent)' : '3px solid transparent',
                 background: isActive ? 'rgba(136,36,38,0.1)' : 'transparent',
                 transition: 'all var(--transition-fast)',
