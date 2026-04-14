@@ -481,13 +481,24 @@ function SiteDetailPanel({ site }: { site: Site }) {
             Последние тревоги
           </div>
           {alerts.map(a => (
-            <div key={a.id} style={{
-              padding: '6px 0', borderBottom: '1px solid var(--color-muted)',
-              fontSize: '12px', display: 'flex', justifyContent: 'space-between',
-            }}>
+            <Link
+              key={a.id}
+              to={`/alerts?alertId=${a.id}`}
+              style={{
+                padding: '6px 0',
+                borderBottom: '1px solid var(--color-muted)',
+                fontSize: '12px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '12px',
+                color: 'inherit',
+                textDecoration: 'none',
+              }}
+            >
               <span style={{ minWidth: 0, marginRight: '12px', overflowWrap: 'anywhere' }}>{a.message || a.type}</span>
               <StatusBadge status={a.status} label={alertStatusLabel(a.status)} size="sm" />
-            </div>
+            </Link>
           ))}
         </div>
       )}

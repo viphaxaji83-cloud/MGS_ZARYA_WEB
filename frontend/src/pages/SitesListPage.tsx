@@ -219,8 +219,19 @@ export function SitesListPage() {
                         }}
                       >
                         <span>{label}</span>
-                        <span style={{ width: '10px', fontSize: '10px', opacity: sortKey === columnSortKey ? 1 : 0.35 }}>
-                          {sortKey === columnSortKey ? (sortDirection === 'asc' ? '▲' : '▼') : '▲'}
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            width: '10px',
+                            textAlign: 'center',
+                            fontSize: '9px',
+                            lineHeight: 1,
+                            opacity: sortKey === columnSortKey ? 1 : 0.35,
+                            transform: sortKey === columnSortKey && sortDirection === 'desc' ? 'rotate(180deg)' : 'none',
+                            transition: 'transform 0.15s ease',
+                          }}
+                        >
+                          ▲
                         </span>
                       </button>
                     ) : label}

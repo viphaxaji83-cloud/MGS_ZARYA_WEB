@@ -1,9 +1,12 @@
 import asyncio
-import json
 import random
 from datetime import datetime, timezone
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+
+from ...core.database import async_session
 from ...core.fill_levels import status_from_fill_level
+from ...models.alert import Alert
 
 router = APIRouter(tags=["websocket"])
 
@@ -53,13 +56,33 @@ async def live_simulator():
 
         if random.random() > 0.7:
             alert_types = ["overflow", "litter", "degradation", "camera_offline"]
+            alert_site_id = random.randint(1, 30)
+            alert_type = random.choice(alert_types)
+            alert_severity = random.choice(["low", "medium", "high", "critical"])
+            alert_created_at = datetime.now(timezone.utc)
+            alert_message = "Автоматически обнаружено изменение состояния"
+
+            async with async_session() as session:
+                alert = Alert(
+                    site_id=alert_site_id,
+                    type=alert_type,
+                    severity=alert_severity,
+                    status="new",
+                    message=alert_message,
+                    created_at=alert_created_at,
+                )
+                session.add(alert)
+                await session.flush()
+                await session.commit()
+
             await broadcast({
                 "type": "new_alert",
                 "data": {
-                    "site_id": random.randint(1, 30),
-                    "alert_type": random.choice(alert_types),
-                    "severity": random.choice(["low", "medium", "high", "critical"]),
-                    "message": "Автоматически обнаружено изменение состояния",
-                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "alert_id": alert.id,
+                    "site_id": alert_site_id,
+                    "alert_type": alert_type,
+                    "severity": alert_severity,
+                    "message": alert_message,
+                    "created_at": alert_created_at.isoformat(),
                 }
             })

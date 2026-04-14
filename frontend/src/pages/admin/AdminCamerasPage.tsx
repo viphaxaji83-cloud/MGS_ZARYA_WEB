@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, api } from '@/api/client';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -22,7 +22,26 @@ type BindingFormState = {
   site_id: string;
 };
 
-const TABLE_HEADERS = ['Код', 'Название', 'Статус', 'Площадка', 'Интервал', 'Ошибки', 'Активность', 'Действия'];
+type CameraSortKey = 'code' | 'name' | 'status' | 'site_id' | 'polling_interval_sec' | 'error_count' | 'last_seen_at';
+type SortDirection = 'asc' | 'desc';
+
+const TABLE_HEADERS: Array<{ label: string; sortKey?: CameraSortKey }> = [
+  { label: 'Код', sortKey: 'code' },
+  { label: 'Название', sortKey: 'name' },
+  { label: 'Статус', sortKey: 'status' },
+  { label: 'Площадка', sortKey: 'site_id' },
+  { label: 'Интервал', sortKey: 'polling_interval_sec' },
+  { label: 'Ошибки', sortKey: 'error_count' },
+  { label: 'Активность', sortKey: 'last_seen_at' },
+  { label: 'Действия' },
+];
+
+const CAMERA_STATUS_ORDER: Record<Camera['status'], number> = {
+  online: 0,
+  maintenance: 1,
+  error: 2,
+  offline: 3,
+};
 
 const selectStyle: React.CSSProperties = {
   width: '100%',
@@ -71,6 +90,25 @@ function normalizeCameraPayload(form: CameraFormState) {
   };
 }
 
+function compareText(a: string | null | undefined, b: string | null | undefined) {
+  const left = a?.trim();
+  const right = b?.trim();
+
+  if (!left && !right) return 0;
+  if (!left) return 1;
+  if (!right) return -1;
+
+  return left.localeCompare(right, 'ru', { numeric: true, sensitivity: 'base' });
+}
+
+function compareDate(a: string | null | undefined, b: string | null | undefined) {
+  if (!a && !b) return 0;
+  if (!a) return 1;
+  if (!b) return -1;
+
+  return new Date(a).getTime() - new Date(b).getTime();
+}
+
 function getApiErrorMessage(error: unknown, fallback: string) {
   if (error instanceof ApiError) {
     try {
@@ -95,11 +133,63 @@ export function AdminCamerasPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [editingCamera, setEditingCamera] = useState<Camera | null>(null);
   const [bindingCamera, setBindingCamera] = useState<Camera | null>(null);
+  const [sortKey, setSortKey] = useState<CameraSortKey>('code');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   const { data: cameras = [], isLoading } = useQuery({
     queryKey: ['admin-cameras'],
     queryFn: () => api.get<Camera[]>('/admin/cameras'),
   });
+
+  const sortedCameras = useMemo(() => {
+    const list = [...cameras];
+
+    list.sort((a, b) => {
+      let result = 0;
+
+      switch (sortKey) {
+        case 'code':
+          result = compareText(a.code, b.code);
+          break;
+        case 'name':
+          result = compareText(a.name, b.name);
+          break;
+        case 'status':
+          result = CAMERA_STATUS_ORDER[a.status] - CAMERA_STATUS_ORDER[b.status];
+          break;
+        case 'site_id':
+          result = (a.site_id ?? Number.MAX_SAFE_INTEGER) - (b.site_id ?? Number.MAX_SAFE_INTEGER);
+          break;
+        case 'polling_interval_sec':
+          result = a.polling_interval_sec - b.polling_interval_sec;
+          break;
+        case 'error_count':
+          result = a.error_count - b.error_count;
+          break;
+        case 'last_seen_at':
+          result = compareDate(a.last_seen_at, b.last_seen_at);
+          break;
+      }
+
+      if (result === 0) {
+        result = compareText(a.code, b.code);
+      }
+
+      return sortDirection === 'asc' ? result : -result;
+    });
+
+    return list;
+  }, [cameras, sortDirection, sortKey]);
+
+  const handleSort = (nextSortKey: CameraSortKey) => {
+    if (sortKey === nextSortKey) {
+      setSortDirection(currentDirection => (currentDirection === 'asc' ? 'desc' : 'asc'));
+      return;
+    }
+
+    setSortKey(nextSortKey);
+    setSortDirection('asc');
+  };
 
   const { data: sites = [] } = useQuery({
     queryKey: ['admin-sites-for-binding'],
@@ -198,9 +288,9 @@ export function AdminCamerasPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--text-sm)', minWidth: '1180px' }}>
               <thead>
                 <tr style={{ background: 'var(--color-bg)', borderBottom: 'var(--border)' }}>
-                  {TABLE_HEADERS.map(header => (
+                  {TABLE_HEADERS.map(({ label, sortKey: columnSortKey }) => (
                     <th
-                      key={header}
+                      key={label}
                       style={{
                         padding: '10px 14px',
                         textAlign: 'left',
@@ -211,13 +301,47 @@ export function AdminCamerasPage() {
                         opacity: 0.6,
                       }}
                     >
-                      {header}
+                      {columnSortKey ? (
+                        <button
+                          type="button"
+                          onClick={() => handleSort(columnSortKey)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: 0,
+                            border: 0,
+                            background: 'none',
+                            color: sortKey === columnSortKey ? 'var(--color-accent)' : 'inherit',
+                            font: 'inherit',
+                            letterSpacing: 'inherit',
+                            textTransform: 'inherit',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <span>{label}</span>
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              width: '10px',
+                              textAlign: 'center',
+                              fontSize: '9px',
+                              lineHeight: 1,
+                              opacity: sortKey === columnSortKey ? 1 : 0.35,
+                              transform: sortKey === columnSortKey && sortDirection === 'desc' ? 'rotate(180deg)' : 'none',
+                              transition: 'transform 0.15s ease',
+                            }}
+                          >
+                            ▲
+                          </span>
+                        </button>
+                      ) : label}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {cameras.map(camera => (
+                {sortedCameras.map(camera => (
                   <tr key={camera.id} style={{ borderBottom: '1px solid var(--color-muted)' }}>
                     <td style={{ padding: '12px 14px', fontWeight: 600, color: 'var(--color-accent)' }}>{camera.code}</td>
                     <td style={{ padding: '12px 14px', fontWeight: 500 }}>{camera.name}</td>

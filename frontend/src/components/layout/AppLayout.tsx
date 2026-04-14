@@ -16,6 +16,7 @@ export function AppLayout() {
         `Новая тревога: ${alertTypeLabel(msg.data.alert_type)} (${severityLabel(msg.data.severity)})`,
         'error',
         'dashboard-map',
+        msg.data.alert_id ? `/alerts?alertId=${msg.data.alert_id}` : '/alerts',
       );
     }
   }, [addToast]);

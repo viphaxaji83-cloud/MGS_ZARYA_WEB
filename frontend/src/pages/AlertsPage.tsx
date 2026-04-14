@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '@/api/client';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Loader } from '@/components/ui/Loader';
@@ -39,6 +39,7 @@ const TABLE_HEADERS: Array<{ label: string; sortKey?: SortKey }> = [
 ];
 
 const ROWS_PER_PAGE = 15;
+const ALERT_HIGHLIGHT_DURATION_MS = 2200;
 
 function compareText(a: string | null | undefined, b: string | null | undefined) {
   const left = a?.trim();
@@ -52,14 +53,22 @@ function compareText(a: string | null | undefined, b: string | null | undefined)
 }
 
 export function AlertsPage() {
+  const [searchParams] = useSearchParams();
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('created_at');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [expandedMessageIds, setExpandedMessageIds] = useState<number[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [highlightedAlertId, setHighlightedAlertId] = useState<number | null>(null);
   const queryClient = useQueryClient();
   const addToast = useToastStore(s => s.add);
+  const focusedAlertIdRef = useRef<number | null>(null);
+  const clearHighlightTimeoutRef = useRef<number | null>(null);
+  const focusAlertId = (() => {
+    const parsed = Number(searchParams.get('alertId'));
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  })();
 
   const { data: alerts = [], isLoading } = useQuery({
     queryKey: ['alerts', typeFilter, statusFilter],
@@ -149,10 +158,72 @@ export function AlertsPage() {
   }, [typeFilter, statusFilter]);
 
   useEffect(() => {
+    focusedAlertIdRef.current = null;
+    setHighlightedAlertId(null);
+
+    if (clearHighlightTimeoutRef.current) {
+      window.clearTimeout(clearHighlightTimeoutRef.current);
+      clearHighlightTimeoutRef.current = null;
+    }
+  }, [focusAlertId]);
+
+  useEffect(() => {
     if (currentPage > totalPages) {
       setCurrentPage(totalPages);
     }
   }, [currentPage, totalPages]);
+
+  useEffect(() => {
+    return () => {
+      if (clearHighlightTimeoutRef.current) {
+        window.clearTimeout(clearHighlightTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!focusAlertId || sortedAlerts.length === 0) {
+      return;
+    }
+
+    const targetIndex = sortedAlerts.findIndex(alert => alert.id === focusAlertId);
+    if (targetIndex === -1) {
+      return;
+    }
+
+    const targetPage = Math.floor(targetIndex / ROWS_PER_PAGE) + 1;
+    if (safeCurrentPage !== targetPage) {
+      setCurrentPage(targetPage);
+      return;
+    }
+
+    if (focusedAlertIdRef.current === focusAlertId) {
+      return;
+    }
+
+    focusedAlertIdRef.current = focusAlertId;
+
+    const scrollTimeout = window.setTimeout(() => {
+      const row = document.getElementById(`alert-row-${focusAlertId}`);
+      if (!row) {
+        return;
+      }
+
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightedAlertId(focusAlertId);
+
+      if (clearHighlightTimeoutRef.current) {
+        window.clearTimeout(clearHighlightTimeoutRef.current);
+      }
+
+      clearHighlightTimeoutRef.current = window.setTimeout(() => {
+        setHighlightedAlertId(current => (current === focusAlertId ? null : current));
+        clearHighlightTimeoutRef.current = null;
+      }, ALERT_HIGHLIGHT_DURATION_MS);
+    }, 80);
+
+    return () => window.clearTimeout(scrollTimeout);
+  }, [focusAlertId, safeCurrentPage, sortedAlerts]);
 
   return (
     <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
@@ -276,12 +347,17 @@ export function AlertsPage() {
                         <span>{label}</span>
                         <span
                           style={{
+                            display: 'inline-block',
                             width: '10px',
-                            fontSize: '10px',
+                            textAlign: 'center',
+                            fontSize: '9px',
+                            lineHeight: 1,
                             opacity: sortKey === columnSortKey ? 1 : 0.35,
+                            transform: sortKey === columnSortKey && sortDirection === 'desc' ? 'rotate(180deg)' : 'none',
+                            transition: 'transform 0.15s ease',
                           }}
                         >
-                          {sortKey === columnSortKey ? (sortDirection === 'asc' ? '▲' : '▼') : '▲'}
+                          ▲
                         </span>
                       </button>
                     ) : (
@@ -298,7 +374,16 @@ export function AlertsPage() {
                 const canExpandMessage = message.length > 90;
 
                 return (
-                  <tr key={alert.id} style={{ borderBottom: '1px solid var(--color-muted)' }}>
+                  <tr
+                    id={`alert-row-${alert.id}`}
+                    key={alert.id}
+                    style={{
+                      borderBottom: '1px solid var(--color-muted)',
+                      background: highlightedAlertId === alert.id ? 'rgba(165, 36, 47, 0.08)' : 'transparent',
+                      boxShadow: highlightedAlertId === alert.id ? 'inset 3px 0 0 var(--color-accent)' : 'none',
+                      transition: 'background 0.2s ease, box-shadow 0.2s ease',
+                    }}
+                  >
                     <td style={{ padding: '10px 14px', fontWeight: 600 }}>#{alert.id}</td>
                     <td style={{ padding: '10px 14px' }}>{alertTypeLabel(alert.type)}</td>
                     <td style={{ padding: '10px 14px' }}>

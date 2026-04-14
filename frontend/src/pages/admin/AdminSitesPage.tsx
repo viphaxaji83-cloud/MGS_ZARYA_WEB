@@ -20,9 +20,29 @@ type SiteFormState = {
   container_count: string;
 };
 
-const TABLE_HEADERS = ['Код', 'Название', 'Адрес', 'Район', 'Статус', 'Камера', 'Активна', 'Действия'];
+type SiteSortKey = 'code' | 'name' | 'address' | 'district' | 'status' | 'camera_id' | 'is_active';
+type SortDirection = 'asc' | 'desc';
+
+const TABLE_HEADERS: Array<{ label: string; sortKey?: SiteSortKey }> = [
+  { label: 'Код', sortKey: 'code' },
+  { label: 'Название', sortKey: 'name' },
+  { label: 'Адрес', sortKey: 'address' },
+  { label: 'Район', sortKey: 'district' },
+  { label: 'Статус', sortKey: 'status' },
+  { label: 'Камера', sortKey: 'camera_id' },
+  { label: 'Активна', sortKey: 'is_active' },
+  { label: 'Действия' },
+];
 const DEFAULT_SITE_LAT = 44.6078;
 const DEFAULT_SITE_LON = 40.1058;
+
+const SITE_STATUS_ORDER: Record<Site['status'], number> = {
+  critical: 0,
+  warning: 1,
+  normal: 2,
+  no_data: 3,
+  offline: 4,
+};
 
 function emptySiteForm(): SiteFormState {
   return {
@@ -84,6 +104,17 @@ function normalizeSitePayload(form: SiteFormState) {
   };
 }
 
+function compareText(a: string | null | undefined, b: string | null | undefined) {
+  const left = a?.trim();
+  const right = b?.trim();
+
+  if (!left && !right) return 0;
+  if (!left) return 1;
+  if (!right) return -1;
+
+  return left.localeCompare(right, 'ru', { numeric: true, sensitivity: 'base' });
+}
+
 function getApiErrorMessage(error: unknown, fallback: string) {
   if (error instanceof ApiError) {
     try {
@@ -111,11 +142,63 @@ export function AdminSitesPage() {
 
   const [showCreate, setShowCreate] = useState(false);
   const [editingSite, setEditingSite] = useState<Site | null>(null);
+  const [sortKey, setSortKey] = useState<SiteSortKey>('code');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   const { data: sites = [], isLoading } = useQuery({
     queryKey: ['admin-sites'],
     queryFn: () => api.get<Site[]>('/admin/sites'),
   });
+
+  const sortedSites = useMemo(() => {
+    const list = [...sites];
+
+    list.sort((a, b) => {
+      let result = 0;
+
+      switch (sortKey) {
+        case 'code':
+          result = compareText(a.code, b.code);
+          break;
+        case 'name':
+          result = compareText(a.name, b.name);
+          break;
+        case 'address':
+          result = compareText(a.address, b.address);
+          break;
+        case 'district':
+          result = compareText(a.district, b.district);
+          break;
+        case 'status':
+          result = SITE_STATUS_ORDER[a.status] - SITE_STATUS_ORDER[b.status];
+          break;
+        case 'camera_id':
+          result = (a.camera_id ?? Number.MAX_SAFE_INTEGER) - (b.camera_id ?? Number.MAX_SAFE_INTEGER);
+          break;
+        case 'is_active':
+          result = Number(a.is_active === false) - Number(b.is_active === false);
+          break;
+      }
+
+      if (result === 0) {
+        result = compareText(a.code, b.code);
+      }
+
+      return sortDirection === 'asc' ? result : -result;
+    });
+
+    return list;
+  }, [sites, sortDirection, sortKey]);
+
+  const handleSort = (nextSortKey: SiteSortKey) => {
+    if (sortKey === nextSortKey) {
+      setSortDirection(currentDirection => (currentDirection === 'asc' ? 'desc' : 'asc'));
+      return;
+    }
+
+    setSortKey(nextSortKey);
+    setSortDirection('asc');
+  };
 
   const createSite = useMutation({
     mutationFn: (body: ReturnType<typeof normalizeSitePayload>) => api.post<Site>('/admin/sites', body),
@@ -207,9 +290,9 @@ export function AdminSitesPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--text-sm)', minWidth: '1120px' }}>
               <thead>
                 <tr style={{ background: 'var(--color-bg)', borderBottom: 'var(--border)' }}>
-                  {TABLE_HEADERS.map(header => (
+                  {TABLE_HEADERS.map(({ label, sortKey: columnSortKey }) => (
                     <th
-                      key={header}
+                      key={label}
                       style={{
                         padding: '10px 14px',
                         textAlign: 'left',
@@ -220,13 +303,47 @@ export function AdminSitesPage() {
                         opacity: 0.6,
                       }}
                     >
-                      {header}
+                      {columnSortKey ? (
+                        <button
+                          type="button"
+                          onClick={() => handleSort(columnSortKey)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: 0,
+                            border: 0,
+                            background: 'none',
+                            color: sortKey === columnSortKey ? 'var(--color-accent)' : 'inherit',
+                            font: 'inherit',
+                            letterSpacing: 'inherit',
+                            textTransform: 'inherit',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <span>{label}</span>
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              width: '10px',
+                              textAlign: 'center',
+                              fontSize: '9px',
+                              lineHeight: 1,
+                              opacity: sortKey === columnSortKey ? 1 : 0.35,
+                              transform: sortKey === columnSortKey && sortDirection === 'desc' ? 'rotate(180deg)' : 'none',
+                              transition: 'transform 0.15s ease',
+                            }}
+                          >
+                            ▲
+                          </span>
+                        </button>
+                      ) : label}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {sites.map(site => (
+                {sortedSites.map(site => (
                   <tr key={site.id} style={{ borderBottom: '1px solid var(--color-muted)' }}>
                     <td style={{ padding: '12px 14px', fontWeight: 600, color: 'var(--color-accent)' }}>{site.code}</td>
                     <td style={{ padding: '12px 14px', fontWeight: 500 }}>{site.name}</td>

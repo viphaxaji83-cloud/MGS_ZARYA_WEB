@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import delete, select
-from typing import Optional
 import httpx
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import delete, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Optional
 
 from ...core.database import get_db
 from ...core.deps import require_admin
@@ -13,6 +13,7 @@ from ...models.site import Site
 from ...models.user import User
 from ...schemas.site import SiteCreate, SiteUpdate, SiteResponse
 from ...services.audit import log_action
+from ...services.geocoding import geocode_site_address as geocode_site_coordinates
 
 router = APIRouter(prefix="/admin/sites", tags=["admin-sites"])
 
@@ -36,52 +37,16 @@ async def _get_site_by_code(db: AsyncSession, code: str, *, exclude_id: Optional
 @router.get("/geocode")
 async def geocode_site_address(
     address: str,
-    db: AsyncSession = Depends(get_db),
     admin: User = Depends(require_admin),
 ):
-    query = address.strip()
-    if not query:
-        raise HTTPException(status_code=400, detail="Address is required")
-
-    candidates: list[str] = [query]
-    if "майкоп" not in query.lower():
-        candidates.append(f"{query}, Майкоп")
-
-    params = {
-        "format": "jsonv2",
-        "limit": 1,
-        "countrycodes": "ru",
-        "addressdetails": 1,
-    }
-    headers = {
-        "User-Agent": "ZaryaPlatform/1.0",
-        "Accept-Language": "ru",
-    }
-
     try:
-        async with httpx.AsyncClient(timeout=15.0, headers=headers, follow_redirects=True) as client:
-            for candidate in dict.fromkeys(candidates):
-                response = await client.get(
-                    "https://nominatim.openstreetmap.org/search",
-                    params={**params, "q": candidate},
-                )
-                response.raise_for_status()
-                data = response.json()
-
-                if not data:
-                    continue
-
-                item = data[0]
-                return {
-                    "lat": float(item["lat"]),
-                    "lon": float(item["lon"]),
-                    "query": candidate,
-                    "resolved_address": item.get("display_name"),
-                }
+        return await geocode_site_coordinates(address)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail="Geocoding service is unavailable") from exc
-
-    raise HTTPException(status_code=404, detail="Coordinates not found for this address")
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.get("", response_model=list[SiteResponse])

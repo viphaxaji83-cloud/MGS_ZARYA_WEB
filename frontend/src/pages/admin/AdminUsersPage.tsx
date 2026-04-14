@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, api } from '@/api/client';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -23,7 +23,24 @@ type PasswordFormState = {
   confirmPassword: string;
 };
 
-const TABLE_HEADERS = ['ID', 'Имя', 'Логин', 'Email', 'Роль', 'Статус', 'Последний вход', 'Действия'];
+type UserSortKey = 'id' | 'name' | 'login' | 'email' | 'role' | 'is_active' | 'last_login_at';
+type SortDirection = 'asc' | 'desc';
+
+const TABLE_HEADERS: Array<{ label: string; sortKey?: UserSortKey }> = [
+  { label: 'ID', sortKey: 'id' },
+  { label: 'Имя', sortKey: 'name' },
+  { label: 'Логин', sortKey: 'login' },
+  { label: 'Email', sortKey: 'email' },
+  { label: 'Роль', sortKey: 'role' },
+  { label: 'Статус', sortKey: 'is_active' },
+  { label: 'Последний вход', sortKey: 'last_login_at' },
+  { label: 'Действия' },
+];
+
+const USER_ROLE_ORDER: Record<User['role'], number> = {
+  admin: 0,
+  operator: 1,
+};
 
 const selectStyle: React.CSSProperties = {
   width: '100%',
@@ -59,6 +76,25 @@ function roleLabel(role: User['role']) {
   return role === 'admin' ? 'Администратор' : 'Оператор';
 }
 
+function compareText(a: string | null | undefined, b: string | null | undefined) {
+  const left = a?.trim();
+  const right = b?.trim();
+
+  if (!left && !right) return 0;
+  if (!left) return 1;
+  if (!right) return -1;
+
+  return left.localeCompare(right, 'ru', { numeric: true, sensitivity: 'base' });
+}
+
+function compareDate(a: string | null | undefined, b: string | null | undefined) {
+  if (!a && !b) return 0;
+  if (!a) return 1;
+  if (!b) return -1;
+
+  return new Date(a).getTime() - new Date(b).getTime();
+}
+
 function getApiErrorMessage(error: unknown, fallback: string) {
   if (error instanceof ApiError) {
     try {
@@ -86,6 +122,8 @@ export function AdminUsersPage() {
   const [passwordUser, setPasswordUser] = useState<User | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
+  const [sortKey, setSortKey] = useState<UserSortKey>('id');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['admin-users', searchQuery, roleFilter],
@@ -96,6 +134,56 @@ export function AdminUsersPage() {
       return api.get<User[]>(`/admin/users?${params}`);
     },
   });
+
+  const sortedUsers = useMemo(() => {
+    const list = [...users];
+
+    list.sort((a, b) => {
+      let result = 0;
+
+      switch (sortKey) {
+        case 'id':
+          result = a.id - b.id;
+          break;
+        case 'name':
+          result = compareText(a.name, b.name);
+          break;
+        case 'login':
+          result = compareText(a.login, b.login);
+          break;
+        case 'email':
+          result = compareText(a.email, b.email);
+          break;
+        case 'role':
+          result = USER_ROLE_ORDER[a.role] - USER_ROLE_ORDER[b.role];
+          break;
+        case 'is_active':
+          result = Number(a.is_active === false) - Number(b.is_active === false);
+          break;
+        case 'last_login_at':
+          result = compareDate(a.last_login_at, b.last_login_at);
+          break;
+      }
+
+      if (result === 0) {
+        result = a.id - b.id;
+      }
+
+      return sortDirection === 'asc' ? result : -result;
+    });
+
+    return list;
+  }, [users, sortDirection, sortKey]);
+
+  const handleSort = (nextSortKey: UserSortKey) => {
+    if (sortKey === nextSortKey) {
+      setSortDirection(currentDirection => (currentDirection === 'asc' ? 'desc' : 'asc'));
+      return;
+    }
+
+    setSortKey(nextSortKey);
+    setSortDirection('asc');
+  };
 
   const createUser = useMutation({
     mutationFn: (body: UserFormState & { password: string }) => api.post<User>('/admin/users', body),
@@ -215,9 +303,9 @@ export function AdminUsersPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--text-sm)', minWidth: '1100px' }}>
               <thead>
                 <tr style={{ background: 'var(--color-bg)', borderBottom: 'var(--border)' }}>
-                  {TABLE_HEADERS.map(header => (
+                  {TABLE_HEADERS.map(({ label, sortKey: columnSortKey }) => (
                     <th
-                      key={header}
+                      key={label}
                       style={{
                         padding: '10px 14px',
                         textAlign: 'left',
@@ -228,13 +316,47 @@ export function AdminUsersPage() {
                         opacity: 0.6,
                       }}
                     >
-                      {header}
+                      {columnSortKey ? (
+                        <button
+                          type="button"
+                          onClick={() => handleSort(columnSortKey)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: 0,
+                            border: 0,
+                            background: 'none',
+                            color: sortKey === columnSortKey ? 'var(--color-accent)' : 'inherit',
+                            font: 'inherit',
+                            letterSpacing: 'inherit',
+                            textTransform: 'inherit',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <span>{label}</span>
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              width: '10px',
+                              textAlign: 'center',
+                              fontSize: '9px',
+                              lineHeight: 1,
+                              opacity: sortKey === columnSortKey ? 1 : 0.35,
+                              transform: sortKey === columnSortKey && sortDirection === 'desc' ? 'rotate(180deg)' : 'none',
+                              transition: 'transform 0.15s ease',
+                            }}
+                          >
+                            ▲
+                          </span>
+                        </button>
+                      ) : label}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {users.map(user => {
+                {sortedUsers.map(user => {
                   const isSelf = currentUser?.id === user.id;
 
                   return (

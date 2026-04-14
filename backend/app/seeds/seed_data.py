@@ -59,6 +59,39 @@ SITES_DATA = [
     {"code": "MKP-030", "name": "РљРџ СѓР». РњРѕР»РѕРґС‘Р¶РЅР°СЏ 20", "address": "СѓР». РњРѕР»РѕРґС‘Р¶РЅР°СЏ, 20, РњР°Р№РєРѕРї", "district": "Р®Р¶РЅС‹Р№", "lat": 44.5955, "lon": 40.1070, "container_count": 3},
 ]
 
+SEEDED_SITE_COORDINATES = {
+    "MKP-001": (44.604863, 40.103764),
+    "MKP-002": (44.606449, 40.107945),
+    "MKP-003": (44.604571, 40.135837),
+    "MKP-004": (44.603414, 40.115003),
+    "MKP-005": (44.609843, 40.109570),
+    "MKP-006": (44.616905, 40.113341),
+    "MKP-007": (44.577454, 40.134326),
+    "MKP-008": (44.622641, 40.107397),
+    "MKP-009": (44.617107, 40.128600),
+    "MKP-010": (44.599335, 40.122351),
+    "MKP-011": (44.613087, 40.055008),
+    "MKP-012": (44.613559, 40.066102),
+    "MKP-013": (44.610154, 40.131509),
+    "MKP-014": (44.616531, 40.103777),
+    "MKP-015": (44.606561, 40.098948),
+    "MKP-016": (44.623037, 40.055500),
+    "MKP-017": (44.603179, 40.059557),
+    "MKP-018": (44.601552, 40.119125),
+    "MKP-019": (44.602814, 40.110375),
+    "MKP-020": (44.601781, 40.078280),
+    "MKP-021": (44.617849, 40.134635),
+    "MKP-022": (44.596235, 40.122942),
+    "MKP-023": (44.587721, 40.053648),
+    "MKP-024": (44.597196, 40.084508),
+    "MKP-025": (44.615433, 40.101761),
+    "MKP-026": (44.594950, 40.101592),
+    "MKP-027": (44.613733, 40.129257),
+    "MKP-028": (44.647126, 40.107850),
+    "MKP-029": (44.599124, 40.048597),
+    "MKP-030": (44.631921, 40.068576),
+}
+
 PLATFORM_SETTINGS = [
     {"key": "dashboard_refresh_interval", "value": "30", "value_type": "int", "description": "РРЅС‚РµСЂРІР°Р» Р°РІС‚РѕРѕР±РЅРѕРІР»РµРЅРёСЏ dashboard (СЃРµРєСѓРЅРґС‹)"},
     {"key": "fill_level_warning_threshold", "value": "55", "value_type": "int", "description": "РџРѕСЂРѕРі Р·Р°РїРѕР»РЅРµРЅРЅРѕСЃС‚Рё РґР»СЏ СЃС‚Р°С‚СѓСЃР° 'РІРЅРёРјР°РЅРёРµ' (%)"},
@@ -171,10 +204,11 @@ async def seed():
             has_overflow = fill > 85 and random.random() > 0.3
             has_litter = random.random() > 0.75 if status != "no_data" else False
             last_capture = now - timedelta(minutes=random.randint(5, 90)) if status != "no_data" else None
+            lat, lon = SEEDED_SITE_COORDINATES.get(sd["code"], (sd["lat"], sd["lon"]))
 
             site = Site(
                 code=sd["code"], name=sd["name"], address=sd["address"],
-                district=sd["district"], lat=sd["lat"], lon=sd["lon"],
+                district=sd["district"], lat=lat, lon=lon,
                 type="standard", container_count=sd["container_count"],
                 status=status, fill_level=fill, ai_confidence=confidence,
                 has_overflow=has_overflow, has_litter_outside=has_litter,

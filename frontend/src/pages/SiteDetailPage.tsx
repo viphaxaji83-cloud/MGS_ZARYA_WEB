@@ -133,16 +133,24 @@ export function SiteDetailPage() {
             {alerts.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '20px', opacity: 0.4, fontSize: 'var(--text-sm)' }}>Нет тревог</div>
             ) : alerts.map(a => (
-              <div key={a.id} style={{
-                padding: '8px 0', borderBottom: '1px solid var(--color-muted)',
-                fontSize: 'var(--text-sm)',
-              }}>
+              <Link
+                key={a.id}
+                to={`/alerts?alertId=${a.id}`}
+                style={{
+                  display: 'block',
+                  padding: '8px 0',
+                  borderBottom: '1px solid var(--color-muted)',
+                  fontSize: 'var(--text-sm)',
+                  color: 'inherit',
+                  textDecoration: 'none',
+                }}
+              >
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                   <span style={{ fontWeight: 500 }}>{alertTypeLabel(a.type)}</span>
                   <StatusBadge status={a.status} label={alertStatusLabel(a.status)} />
                 </div>
                 <div style={{ fontSize: '11px', opacity: 0.5, marginTop: '2px' }}>{formatDate(a.created_at)}</div>
-              </div>
+              </Link>
             ))}
           </div>
         </Card>
